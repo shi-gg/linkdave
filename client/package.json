@@ -1,0 +1,38 @@
+{
+    "name": "linkdave",
+    "version": "0.0.1",
+    "description": "TypeScript client library for linkdave Discord audio streaming server",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "lint": "bunx eslint . --fix",
+        "build": "rm -rf dist && tsc"
+    },
+    "engines": {
+        "node": ">=24.0.0"
+    },
+    "devDependencies": {
+        "@mwlica/eslint": "^1.1.2",
+        "@types/node": "^25.0.9",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.53.0"
+    },
+    "keywords": [
+        "discord",
+        "audio",
+        "voice",
+        "streaming",
+        "linkdave"
+    ],
+    "license": "AGPL-3.0-only"
+}
