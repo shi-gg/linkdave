@@ -1,0 +1,15 @@
+{
+    "name": "linkdave-example-bot",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "start": "bun run index.ts"
+    },
+    "dependencies": {
+        "linkdave": "file:../client",
+        "discord.js": "^14.25.1"
+    },
+    "devDependencies": {
+        "@types/node": "^25.0.9"
+    }
+}
