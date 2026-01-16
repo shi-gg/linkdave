@@ -1,4 +1,4 @@
-name: Test client package
+name: client
 
 on:
     pull_request:
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
     test:
+        name: Test Client
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6

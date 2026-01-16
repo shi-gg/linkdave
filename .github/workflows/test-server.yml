@@ -1,4 +1,4 @@
-name: Test server
+name: server
 
 on:
     pull_request:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
     test:
-        name: Build and Push to GHCR
+        name: Test Srver
         runs-on: ubuntu-latest
 
         steps:

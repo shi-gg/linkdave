@@ -1,4 +1,4 @@
-name: Publish to GHCR
+name: server
 
 on:
     push:
@@ -10,8 +10,8 @@ permissions:
     packages: write
 
 jobs:
-    build-and-push:
-        name: Build and Push to GHCR
+    build:
+        name: Publish GHCR
         runs-on: ubuntu-latest
 
         steps:
