@@ -281,9 +281,7 @@ export class LinkDaveClient extends EventEmitter {
 
     _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node): void {
         const player = this.#players.get(guildId);
-
-        // Return if the player is NEITHER on the old node NOR on the new node
-        if (player?.node !== oldNode && player?.node !== newNode) return;
+        if (player?.node !== oldNode) return;
 
         oldNode.decrementPlayerCount();
         newNode.incrementPlayerCount();
