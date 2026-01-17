@@ -1,12 +1,9 @@
 export type { GatewayPayload, LinkDaveClientOptions, LinkDaveManagerEvents, SendToShardFn } from "./client.js";
 export { LinkDaveClient } from "./client.js";
-
 export type { NodeOptions, NodeState } from "./node.js";
 export { Node } from "./node.js";
-
 export type { PlayerOptions, PlayOptions, RawVoiceServerUpdate, RawVoiceStateUpdate } from "./player.js";
 export { Player } from "./player.js";
-
 export type {
     GuildPayload,
     IdentifyPayload,
@@ -33,7 +30,6 @@ export type {
     VoiceUpdatePayload,
     VolumePayload
 } from "./types.js";
-
 export {
     ClientOpCodes,
     ServerOpCodes

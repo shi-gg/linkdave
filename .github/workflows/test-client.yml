@@ -1,0 +1,31 @@
+name: client
+
+on:
+    pull_request:
+        branches:
+            - main
+
+permissions:
+    contents: read
+
+jobs:
+    test:
+        name: Test Client
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "latest"
+
+            - run: bun install --frozen-lockfile
+              working-directory: ./client
+
+            - run: bun run build
+              working-directory: ./client
+
+            - run: bunx eslint . --no-fix
+              working-directory: ./client
