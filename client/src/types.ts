@@ -35,7 +35,6 @@ export interface Message<T = unknown> {
     d?: T;
 }
 
-
 export interface IdentifyPayload {
     bot_id: string;
 }

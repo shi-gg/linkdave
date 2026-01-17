@@ -9,7 +9,6 @@ import type {
     PlayerUpdatePayload
 } from "./types.js";
 
-
 export interface GatewayPayload {
     op: number;
     d: unknown;
