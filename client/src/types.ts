@@ -1,3 +1,5 @@
+import type { Node } from "./node.js";
+
 export enum ClientOpCodes {
     Identify = 0,
     VoiceUpdate = 1,
@@ -108,12 +110,12 @@ export interface TrackErrorPayload {
     error: string;
 }
 
-export interface VoiceConnectedPayload {
+export interface VoiceConnectPayload {
     guild_id: string;
     channel_id: string;
 }
 
-export interface VoiceDisconnectedPayload {
+export interface VoiceDisconnectPayload {
     guild_id: string;
     reason?: string;
 }
@@ -145,20 +147,49 @@ export interface MigrateReadyPayload {
     state: PlayerState;
 }
 
-export interface LinkDaveEvents {
-    ready: ReadyPayload;
-    playerUpdate: PlayerUpdatePayload;
-    trackStart: TrackStartPayload;
-    trackEnd: TrackEndPayload;
-    trackError: TrackErrorPayload;
-    voiceConnected: VoiceConnectedPayload;
-    voiceDisconnected: VoiceDisconnectedPayload;
-    pong: undefined;
-    stats: StatsPayload;
-    nodeDraining: NodeDrainingPayload;
-    migrateReady: MigrateReadyPayload;
-    close: { code: number; reason: string; };
-    error: Error;
+export enum EventName {
+    Ready = "ready",
+    PlayerUpdate = "playerUpdate",
+    TrackStart = "trackStart",
+    TrackEnd = "trackEnd",
+    TrackError = "trackError",
+    VoiceConnect = "voiceConnect",
+    VoiceDisconnect = "voiceDisconnect",
+
+    Pong = "pong",
+    Stats = "stats",
+
+    NodeDraining = "nodeDraining",
+    MigrateReady = "migrateReady",
+
+    Close = "close",
+    Error = "error"
 }
 
-export type LinkDaveEventName = keyof LinkDaveEvents;
+export interface Events {
+    [EventName.Ready]: ReadyPayload;
+    [EventName.PlayerUpdate]: PlayerUpdatePayload;
+    [EventName.TrackStart]: TrackStartPayload;
+    [EventName.TrackEnd]: TrackEndPayload;
+    [EventName.TrackError]: TrackErrorPayload;
+    [EventName.VoiceConnect]: VoiceConnectPayload;
+    [EventName.VoiceDisconnect]: VoiceDisconnectPayload;
+    [EventName.Pong]: undefined;
+    [EventName.Stats]: StatsPayload;
+    [EventName.NodeDraining]: NodeDrainingPayload;
+    [EventName.MigrateReady]: MigrateReadyPayload;
+    [EventName.Close]: { code: number; reason: string; };
+    [EventName.Error]: Error;
+}
+
+export enum ManagerEventName {
+    NodeAdd = "nodeAdd",
+    NodeRemove = "nodeRemove",
+    NodeReconnectAttempt = "nodeReconnectAttempt"
+}
+
+export interface ManagerEvents extends Events {
+    [ManagerEventName.NodeAdd]: { node: Node; };
+    [ManagerEventName.NodeRemove]: { node: Node; };
+    [ManagerEventName.NodeReconnectAttempt]: { node: Node; attempt: number; };
+}

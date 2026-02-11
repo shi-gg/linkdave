@@ -1,20 +1,22 @@
+import type { GatewayDispatchPayload, GatewayVoiceStateUpdate } from "discord-api-types/v10";
+import { GatewayDispatchEvents } from "discord-api-types/v10";
 import { EventEmitter } from "node:events";
 
 import { Node, type NodeOptions } from "./node.js";
 import { Player, type PlayerOptions } from "./player.js";
 import type {
-    LinkDaveEvents,
+    Events,
+    ManagerEvents,
     MigrateReadyPayload,
     NodeDrainingPayload,
     PlayerUpdatePayload
 } from "./types.js";
+import {
+    EventName,
+    ManagerEventName
+} from "./types.js";
 
-export interface GatewayPayload {
-    op: number;
-    d: unknown;
-}
-
-export type SendToShardFn = (guildId: string, payload: GatewayPayload) => void;
+export type SendToShardFn = (guildId: string, payload: GatewayVoiceStateUpdate) => void;
 
 export interface LinkDaveClientOptions {
     clientId: string;
@@ -22,18 +24,12 @@ export interface LinkDaveClientOptions {
     sendToShard: SendToShardFn;
 }
 
-export interface LinkDaveManagerEvents extends LinkDaveEvents {
-    nodeAdded: { node: Node; };
-    nodeRemoved: { node: Node; };
-    nodeReconnecting: { node: Node; attempt: number; };
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LinkDaveClient {
-    on: <K extends keyof LinkDaveManagerEvents>(event: K, listener: (data: LinkDaveManagerEvents[K]) => void) => this;
-    once: <K extends keyof LinkDaveManagerEvents>(event: K, listener: (data: LinkDaveManagerEvents[K]) => void) => this;
-    off: <K extends keyof LinkDaveManagerEvents>(event: K, listener: (data: LinkDaveManagerEvents[K]) => void) => this;
-    emit: <K extends keyof LinkDaveManagerEvents>(event: K, data: LinkDaveManagerEvents[K]) => boolean;
+    on: <K extends keyof ManagerEvents>(event: K, listener: (data: ManagerEvents[K]) => void) => this;
+    once: <K extends keyof ManagerEvents>(event: K, listener: (data: ManagerEvents[K]) => void) => this;
+    off: <K extends keyof ManagerEvents>(event: K, listener: (data: ManagerEvents[K]) => void) => this;
+    emit: <K extends keyof ManagerEvents>(event: K, data: ManagerEvents[K]) => boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -64,7 +60,7 @@ export class LinkDaveClient extends EventEmitter {
         const node = new Node(options);
         this.#setupNodeListeners(node);
         this.#nodes.set(options.name, node);
-        this.emit("nodeAdded", { node });
+        this.emit(ManagerEventName.NodeAdd, { node });
 
         return node;
     }
@@ -75,7 +71,7 @@ export class LinkDaveClient extends EventEmitter {
 
         node.disconnect();
         this.#nodes.delete(name);
-        this.emit("nodeRemoved", { node });
+        this.emit(ManagerEventName.NodeRemove, { node });
 
         return true;
     }
@@ -89,11 +85,10 @@ export class LinkDaveClient extends EventEmitter {
     }
 
     async connectAll(): Promise<void> {
-        const promises = [...this.#nodes.values()].map((node) =>
+        const promises = Array.from(this.#nodes.values(), (node) =>
             node.connect(this.#clientId).catch(() => {
                 // Ignore connection errors during initial connect
-            })
-        );
+            }));
 
         await Promise.all(promises);
     }
@@ -173,64 +168,63 @@ export class LinkDaveClient extends EventEmitter {
         return this.#clientId;
     }
 
-    handleRaw(packet: { t: string; d: unknown; }): void {
-        if (packet.t === "VOICE_STATE_UPDATE") {
-            const data = packet.d as {
-                guild_id: string;
-                channel_id: string | null;
-                user_id: string;
-                session_id: string;
-            };
+    handleRaw({ t: event, d: data }: GatewayDispatchPayload): void {
+        switch (event) {
+            case GatewayDispatchEvents.VoiceStateUpdate: {
+                // I am not sure in what cases guild_id would be null, DMs maybe?
+                // https://discord.com/developers/docs/resources/voice#voice-state-object
+                if (!data.guild_id) return;
+                if (data.user_id !== this.#clientId) return;
 
-            if (data.user_id !== this.#clientId) return;
+                const player = this.#players.get(data.guild_id);
+                player?.handleVoiceStateUpdate({
+                    channel_id: data.channel_id,
+                    session_id: data.session_id
+                });
 
-            const player = this.#players.get(data.guild_id);
-            player?.handleVoiceStateUpdate({
-                channel_id: data.channel_id,
-                session_id: data.session_id
-            });
-        }
+                break;
+            }
+            case GatewayDispatchEvents.VoiceServerUpdate: {
+                const player = this.#players.get(data.guild_id);
+                player?.handleVoiceServerUpdate(data);
 
-        if (packet.t === "VOICE_SERVER_UPDATE") {
-            const data = packet.d as {
-                guild_id: string;
-                token: string;
-                endpoint: string;
-            };
-
-            const player = this.#players.get(data.guild_id);
-            player?.handleVoiceServerUpdate(data);
+                break;
+            }
         }
     }
 
-    _sendToShard(guildId: string, payload: GatewayPayload): void {
+    _sendToShard(guildId: string, payload: GatewayVoiceStateUpdate): void {
         this.#sendToShard(guildId, payload);
     }
 
     #setupNodeListeners(node: Node): void {
-        node.on("ready", (data) => this.emit("ready", data));
-        node.on("playerUpdate", (data) => this.#handlePlayerUpdate(node, data));
-        node.on("trackStart", (data) => this.#forwardPlayerEvent(node, data.guild_id, "trackStart", data));
-        node.on("trackEnd", (data) => this.#forwardPlayerEvent(node, data.guild_id, "trackEnd", data));
-        node.on("trackError", (data) => this.#forwardPlayerEvent(node, data.guild_id, "trackError", data));
-        node.on("voiceConnected", (data) => this.#forwardPlayerEvent(node, data.guild_id, "voiceConnected", data));
-        node.on("voiceDisconnected", (data) => this.#forwardPlayerEvent(node, data.guild_id, "voiceDisconnected", data));
-        node.on("pong", () => this.emit("pong", undefined));
-        node.on("stats", (data) => this.emit("stats", data));
-        node.on("nodeDraining", (data) => this.#handleNodeDraining(node, data));
-        node.on("migrateReady", (data) => this.#handleMigrateReady(node, data));
-        node.on("close", (data) => this.emit("close", data));
-        node.on("error", (data) => this.emit("error", data));
+        node.on(EventName.Ready, (data) => this.emit(EventName.Ready, data));
+        node.on(EventName.PlayerUpdate, (data) => this.#handlePlayerUpdate(node, data));
+
+        node.on(EventName.TrackStart, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackStart, data));
+        node.on(EventName.TrackEnd, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackEnd, data));
+        node.on(EventName.TrackError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackError, data));
+        node.on(EventName.VoiceConnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceConnect, data));
+        node.on(EventName.VoiceDisconnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceDisconnect, data));
+
+        node.on(EventName.Pong, () => this.emit(EventName.Pong, undefined));
+        node.on(EventName.Stats, (data) => this.emit(EventName.Stats, data));
+
+        node.on(EventName.NodeDraining, (data) => this.#handleNodeDraining(node, data));
+        node.on(EventName.MigrateReady, (data) => this.#handleMigrateReady(node, data));
+
+        node.on(EventName.Close, (data) => this.emit(EventName.Close, data));
+        node.on(EventName.Error, (data) => this.emit(EventName.Error, data));
     }
 
-    #forwardPlayerEvent<K extends keyof LinkDaveEvents>(
+    #forwardPlayerEvent<K extends keyof Events>(
         node: Node,
         guildId: string,
         event: K,
-        data: LinkDaveEvents[K]
+        data: Events[K]
     ) {
         if (this.#playerNodes.get(guildId) !== node) return;
-        this.emit(event, data as LinkDaveManagerEvents[K]);
+        this.emit(event, data as ManagerEvents[K]);
     }
 
     #handlePlayerUpdate(node: Node, data: PlayerUpdatePayload): void {
@@ -241,11 +235,11 @@ export class LinkDaveClient extends EventEmitter {
         const player = this.#players.get(data.guild_id);
         if (player) player._updateState(data);
 
-        this.emit("playerUpdate", data);
+        this.emit(EventName.PlayerUpdate, data);
     }
 
     #handleNodeDraining(node: Node, data: NodeDrainingPayload): void {
-        this.emit("nodeDraining", data);
+        this.emit(EventName.NodeDraining, data);
 
         for (const [guildId, playerNode] of this.#playerNodes) {
             if (playerNode !== node) continue;
@@ -264,7 +258,7 @@ export class LinkDaveClient extends EventEmitter {
     }
 
     #handleMigrateReady(_node: Node, data: MigrateReadyPayload): void {
-        this.emit("migrateReady", data);
+        this.emit(EventName.MigrateReady, data);
 
         const player = this.#players.get(data.guild_id);
         if (!player) return;

@@ -1,3 +1,5 @@
+import { GatewayOpcodes, type GatewayVoiceServerUpdateDispatchData, type GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
+
 import type { LinkDaveClient } from "./client.js";
 import type { Node } from "./node.js";
 import type {
@@ -20,16 +22,8 @@ export interface PlayerOptions {
     selfDeaf?: boolean;
 }
 
-export interface RawVoiceStateUpdate {
-    channel_id: string | null;
-    session_id: string;
-}
-
-export interface RawVoiceServerUpdate {
-    token: string;
-    guild_id: string;
-    endpoint: string;
-}
+export type RawVoiceStateUpdate = Pick<GatewayVoiceStateUpdateDispatchData, "channel_id" | "session_id">;
+export type RawVoiceServerUpdate = Pick<GatewayVoiceServerUpdateDispatchData, "token" | "guild_id" | "endpoint">;
 
 interface VoiceState {
     channelId: string;
@@ -42,8 +36,6 @@ interface PendingVoiceState {
     sessionId?: string;
     serverEvent?: VoiceServerEvent;
 }
-
-const VOICE_STATE_UPDATE_OP = 4;
 
 export class Player {
     readonly #client: LinkDaveClient;
@@ -120,7 +112,7 @@ export class Player {
         this.#voiceChannelId = targetChannel;
 
         this.#client._sendToShard(this.#guildId, {
-            op: VOICE_STATE_UPDATE_OP,
+            op: GatewayOpcodes.VoiceStateUpdate,
             d: {
                 guild_id: this.#guildId,
                 channel_id: targetChannel,
@@ -132,7 +124,7 @@ export class Player {
 
     disconnect() {
         this.#client._sendToShard(this.#guildId, {
-            op: VOICE_STATE_UPDATE_OP,
+            op: GatewayOpcodes.VoiceStateUpdate,
             d: {
                 guild_id: this.#guildId,
                 channel_id: null,
@@ -163,12 +155,19 @@ export class Player {
         this.#tryConnectLinkDave();
     }
 
+    // A null endpoint means that the voice server allocated has gone away and is trying to be reallocated.
+    // You should attempt to disconnect from the currently connected voice server,
+    // and not attempt to reconnect until a new voice server is allocated.
     handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
         this.#pendingVoice ??= {};
+
+        const endpoint = data.endpoint || this.#pendingVoice.serverEvent?.endpoint;
+        if (!endpoint) throw new Error("Missing voice server endpoint"); // TODO
+
         this.#pendingVoice.serverEvent = {
             token: data.token,
             guild_id: data.guild_id,
-            endpoint: data.endpoint
+            endpoint
         };
 
         this.#tryConnectLinkDave();
