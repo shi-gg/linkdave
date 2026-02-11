@@ -1,3 +1,5 @@
+import type { Node } from "./node.js";
+
 export enum ClientOpCodes {
     Identify = 0,
     VoiceUpdate = 1,
@@ -26,14 +28,45 @@ export enum ServerOpCodes {
     MigrateReady = 10
 }
 
-export type TrackEndReason = "finished" | "stopped" | "replaced" | "error" | "cleanup";
-
-export type PlayerState = "idle" | "playing" | "paused";
-
-export interface Message<T = unknown> {
-    op: number;
-    d?: T;
+export enum TrackEndReason {
+    Finished = "finished",
+    Stopped = "stopped",
+    Replaced = "replaced",
+    Error = "error",
+    Cleanup = "cleanup"
 }
+
+export enum PlayerState {
+    Idle = "idle",
+    Playing = "playing",
+    Paused = "paused"
+}
+
+export type ServerMessage =
+    | { op: ServerOpCodes.Ready; d: ReadyPayload; }
+    | { op: ServerOpCodes.PlayerUpdate; d: PlayerUpdatePayload; }
+    | { op: ServerOpCodes.TrackStart; d: TrackStartPayload; }
+    | { op: ServerOpCodes.TrackEnd; d: TrackEndPayload; }
+    | { op: ServerOpCodes.TrackError; d: TrackErrorPayload; }
+    | { op: ServerOpCodes.VoiceConnected; d: VoiceConnectPayload; }
+    | { op: ServerOpCodes.VoiceDisconnected; d: VoiceDisconnectPayload; }
+    | { op: ServerOpCodes.Pong; d?: undefined; }
+    | { op: ServerOpCodes.Stats; d: StatsPayload; }
+    | { op: ServerOpCodes.NodeDraining; d: NodeDrainingPayload; }
+    | { op: ServerOpCodes.MigrateReady; d: MigrateReadyPayload; };
+
+export type ClientMessage =
+    | { op: ClientOpCodes.Identify; d: IdentifyPayload; }
+    | { op: ClientOpCodes.VoiceUpdate; d: VoiceUpdatePayload; }
+    | { op: ClientOpCodes.Play; d: PlayPayload; }
+    | { op: ClientOpCodes.Pause; d: GuildPayload; }
+    | { op: ClientOpCodes.Resume; d: GuildPayload; }
+    | { op: ClientOpCodes.Stop; d: GuildPayload; }
+    | { op: ClientOpCodes.Seek; d: SeekPayload; }
+    | { op: ClientOpCodes.Disconnect; d: GuildPayload; }
+    | { op: ClientOpCodes.Ping; d?: undefined; }
+    | { op: ClientOpCodes.Volume; d: VolumePayload; }
+    | { op: ClientOpCodes.PlayerMigrate; d: PlayerMigratePayload; };
 
 export interface IdentifyPayload {
     bot_id: string;
@@ -108,12 +141,12 @@ export interface TrackErrorPayload {
     error: string;
 }
 
-export interface VoiceConnectedPayload {
+export interface VoiceConnectPayload {
     guild_id: string;
     channel_id: string;
 }
 
-export interface VoiceDisconnectedPayload {
+export interface VoiceDisconnectPayload {
     guild_id: string;
     reason?: string;
 }
@@ -145,20 +178,49 @@ export interface MigrateReadyPayload {
     state: PlayerState;
 }
 
-export interface LinkDaveEvents {
-    ready: ReadyPayload;
-    playerUpdate: PlayerUpdatePayload;
-    trackStart: TrackStartPayload;
-    trackEnd: TrackEndPayload;
-    trackError: TrackErrorPayload;
-    voiceConnected: VoiceConnectedPayload;
-    voiceDisconnected: VoiceDisconnectedPayload;
-    pong: undefined;
-    stats: StatsPayload;
-    nodeDraining: NodeDrainingPayload;
-    migrateReady: MigrateReadyPayload;
-    close: { code: number; reason: string; };
-    error: Error;
+export enum EventName {
+    Ready = "ready",
+    PlayerUpdate = "playerUpdate",
+    TrackStart = "trackStart",
+    TrackEnd = "trackEnd",
+    TrackError = "trackError",
+    VoiceConnect = "voiceConnect",
+    VoiceDisconnect = "voiceDisconnect",
+
+    Pong = "pong",
+    Stats = "stats",
+
+    NodeDraining = "nodeDraining",
+    MigrateReady = "migrateReady",
+
+    Close = "close",
+    Error = "error"
 }
 
-export type LinkDaveEventName = keyof LinkDaveEvents;
+export interface Events {
+    [EventName.Ready]: ReadyPayload;
+    [EventName.PlayerUpdate]: PlayerUpdatePayload;
+    [EventName.TrackStart]: TrackStartPayload;
+    [EventName.TrackEnd]: TrackEndPayload;
+    [EventName.TrackError]: TrackErrorPayload;
+    [EventName.VoiceConnect]: VoiceConnectPayload;
+    [EventName.VoiceDisconnect]: VoiceDisconnectPayload;
+    [EventName.Pong]: undefined;
+    [EventName.Stats]: StatsPayload;
+    [EventName.NodeDraining]: NodeDrainingPayload;
+    [EventName.MigrateReady]: MigrateReadyPayload;
+    [EventName.Close]: { code: number; reason: string; };
+    [EventName.Error]: Error;
+}
+
+export enum ManagerEventName {
+    NodeAdd = "nodeAdd",
+    NodeRemove = "nodeRemove",
+    NodeReconnectAttempt = "nodeReconnectAttempt"
+}
+
+export interface ManagerEvents extends Events {
+    [ManagerEventName.NodeAdd]: { node: Node; };
+    [ManagerEventName.NodeRemove]: { node: Node; };
+    [ManagerEventName.NodeReconnectAttempt]: { node: Node; attempt: number; };
+}

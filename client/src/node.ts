@@ -1,28 +1,16 @@
 import { EventEmitter } from "node:events";
 
 import type {
-    GuildPayload,
-    IdentifyPayload,
-    LinkDaveEvents,
-    Message,
-    MigrateReadyPayload,
-    NodeDrainingPayload,
-    PlayerMigratePayload,
-    PlayerUpdatePayload,
+    ClientMessage, Events,
     PlayPayload,
-    ReadyPayload,
     SeekPayload,
-    StatsPayload,
-    TrackEndPayload,
-    TrackErrorPayload,
-    TrackStartPayload,
-    VoiceConnectedPayload,
-    VoiceDisconnectedPayload,
+    ServerMessage,
     VoiceUpdatePayload,
     VolumePayload
 } from "./types.js";
 import {
     ClientOpCodes,
+    EventName,
     ServerOpCodes
 } from "./types.js";
 
@@ -34,30 +22,37 @@ export interface NodeOptions {
     maxReconnectAttempts?: number;
 }
 
-export type NodeState = "disconnected" | "connecting" | "connected" | "draining";
+export enum NodeState {
+    Disconnected = 0,
+    Connecting = 1,
+    Connected = 2,
+    Draining = 3
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Node {
-    on: <K extends keyof LinkDaveEvents>(event: K, listener: (data: LinkDaveEvents[K]) => void) => this;
-    once: <K extends keyof LinkDaveEvents>(event: K, listener: (data: LinkDaveEvents[K]) => void) => this;
-    off: <K extends keyof LinkDaveEvents>(event: K, listener: (data: LinkDaveEvents[K]) => void) => this;
-    emit: <K extends keyof LinkDaveEvents>(event: K, data: LinkDaveEvents[K]) => boolean;
+    on: <K extends keyof Events>(event: K, listener: (data: Events[K]) => void) => this;
+    once: <K extends keyof Events>(event: K, listener: (data: Events[K]) => void) => this;
+    off: <K extends keyof Events>(event: K, listener: (data: Events[K]) => void) => this;
+    emit: <K extends keyof Events>(event: K, data: Events[K]) => boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node extends EventEmitter {
+    private static readonly NODE_PING_INTERVAL = 30_000;
+
     readonly name: string;
     readonly url: string;
     readonly #options: Required<Omit<NodeOptions, "name" | "url">>;
+
     #ws: WebSocket | null = null;
     #sessionId: string | null = null;
     #clientId: string | null = null;
     #reconnectAttempts = 0;
     #reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     #pingInterval: ReturnType<typeof setInterval> | null = null;
-    #state: NodeState = "disconnected";
+    #state: NodeState = NodeState.Disconnected;
     #playerCount = 0;
-    #draining = false;
 
     constructor(options: NodeOptions) {
         super();
@@ -72,7 +67,7 @@ export class Node extends EventEmitter {
 
     connect(clientId: string) {
         this.#clientId = clientId;
-        this.#state = "connecting";
+        this.#state = NodeState.Connecting;
 
         return new Promise((resolve, reject) => {
             if (this.#ws) {
@@ -89,7 +84,7 @@ export class Node extends EventEmitter {
             this.#ws = new WebSocket(url.toString());
 
             const onOpen = () => {
-                this.#state = "connected";
+                this.#state = NodeState.Connected;
                 this.#reconnectAttempts = 0;
                 this.#startPingInterval();
                 this.#sendIdentify();
@@ -99,7 +94,7 @@ export class Node extends EventEmitter {
             const onError = (event: Event) => {
                 const message = "message" in event ? String((event as { message: unknown; }).message) : "unknown";
                 const error = new Error(`WebSocket error: ${message}`);
-                this.emit("error", error);
+                this.emit(EventName.Error, error);
                 reject(error);
             };
 
@@ -119,7 +114,7 @@ export class Node extends EventEmitter {
             this.#ws = null;
         }
 
-        this.#state = "disconnected";
+        this.#state = NodeState.Disconnected;
         this.#sessionId = null;
     }
 
@@ -136,11 +131,11 @@ export class Node extends EventEmitter {
     }
 
     get draining() {
-        return this.#draining;
+        return this.state === NodeState.Draining;
     }
 
     get connected() {
-        return this.#state === "connected";
+        return this.#state === NodeState.Connected;
     }
 
     incrementPlayerCount() {
@@ -155,76 +150,62 @@ export class Node extends EventEmitter {
 
     #onMessage(event: MessageEvent) {
         try {
-            const message = JSON.parse(event.data as string) as Message;
+            const message = JSON.parse(event.data as string) as ServerMessage;
             this.#handleMessage(message);
         } catch {
             // Invalid messages are silently ignored
         }
     }
 
-    #handleMessage(message: Message) {
+    #handleMessage(message: ServerMessage) {
         switch (message.op) {
             case ServerOpCodes.Ready:
-                this.#handleReady(message.d as ReadyPayload);
+                this.#sessionId = message.d.session_id;
+                this.emit(EventName.Ready, message.d);
                 break;
             case ServerOpCodes.PlayerUpdate:
-                this.emit("playerUpdate", message.d as PlayerUpdatePayload);
+                this.emit(EventName.PlayerUpdate, message.d);
                 break;
             case ServerOpCodes.TrackStart:
-                this.emit("trackStart", message.d as TrackStartPayload);
+                this.emit(EventName.TrackStart, message.d);
                 break;
             case ServerOpCodes.TrackEnd:
-                this.emit("trackEnd", message.d as TrackEndPayload);
+                this.emit(EventName.TrackEnd, message.d);
                 break;
             case ServerOpCodes.TrackError:
-                this.emit("trackError", message.d as TrackErrorPayload);
+                this.emit(EventName.TrackError, message.d);
                 break;
             case ServerOpCodes.VoiceConnected:
-                this.emit("voiceConnected", message.d as VoiceConnectedPayload);
+                this.emit(EventName.VoiceConnect, message.d);
                 break;
             case ServerOpCodes.VoiceDisconnected:
-                this.emit("voiceDisconnected", message.d as VoiceDisconnectedPayload);
+                this.emit(EventName.VoiceDisconnect, message.d);
                 break;
             case ServerOpCodes.Pong:
-                this.emit("pong", undefined);
+                this.emit(EventName.Pong, undefined);
                 break;
             case ServerOpCodes.Stats:
-                this.#handleStats(message.d as StatsPayload);
+                this.#playerCount = message.d.players;
+                this.#state = message.d.draining ? NodeState.Draining : NodeState.Connected;
+                this.emit(EventName.Stats, message.d);
                 break;
             case ServerOpCodes.NodeDraining:
-                this.#handleNodeDraining(message.d as NodeDrainingPayload);
+                this.#state = NodeState.Draining;
+                this.emit(EventName.NodeDraining, message.d);
                 break;
             case ServerOpCodes.MigrateReady:
-                this.emit("migrateReady", message.d as MigrateReadyPayload);
+                this.emit(EventName.MigrateReady, message.d);
                 break;
         }
     }
 
-    #handleReady(data: ReadyPayload) {
-        this.#sessionId = data.session_id;
-        this.emit("ready", data);
-    }
-
-    #handleStats(data: StatsPayload) {
-        this.#playerCount = data.players;
-        this.#draining = data.draining;
-        this.emit("stats", data);
-    }
-
-    #handleNodeDraining(data: NodeDrainingPayload) {
-        this.#draining = true;
-        this.#state = "draining";
-        this.emit("nodeDraining", data);
-    }
-
     #onClose(event: CloseEvent) {
-        this.#state = "disconnected";
-        this.#draining = false;
+        this.#state = NodeState.Disconnected;
         this.#stopPingInterval();
 
-        this.emit("close", { code: event.code, reason: event.reason });
+        this.emit(EventName.Close, { code: event.code, reason: event.reason });
 
-        if (this.#options.autoReconnect && !this.#draining && this.#reconnectAttempts < this.#options.maxReconnectAttempts) {
+        if (this.#options.autoReconnect && !this.draining && this.#reconnectAttempts < this.#options.maxReconnectAttempts) {
             this.#scheduleReconnect();
         }
     }
@@ -232,7 +213,7 @@ export class Node extends EventEmitter {
     #scheduleReconnect() {
         if (this.#reconnectTimeout || !this.#clientId) return;
 
-        const delay = this.#options.reconnectDelay * Math.pow(2, this.#reconnectAttempts);
+        const delay = this.#options.reconnectDelay * (2) ** (this.#reconnectAttempts);
         this.#reconnectAttempts++;
 
         this.#reconnectTimeout = setTimeout(() => {
@@ -257,7 +238,7 @@ export class Node extends EventEmitter {
     #startPingInterval() {
         this.#pingInterval = setInterval(
             () => this.#send(ClientOpCodes.Ping, undefined),
-            30_000
+            Node.NODE_PING_INTERVAL
         );
     }
 
@@ -272,7 +253,7 @@ export class Node extends EventEmitter {
     #sendIdentify() {
         if (!this.#clientId) return;
 
-        this.#send<IdentifyPayload>(ClientOpCodes.Identify, {
+        this.#send(ClientOpCodes.Identify, {
             bot_id: this.#clientId
         });
     }
@@ -286,15 +267,15 @@ export class Node extends EventEmitter {
     }
 
     sendPause(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Pause, { guild_id: guildId });
+        this.#send(ClientOpCodes.Pause, { guild_id: guildId });
     }
 
     sendResume(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Resume, { guild_id: guildId });
+        this.#send(ClientOpCodes.Resume, { guild_id: guildId });
     }
 
     sendStop(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Stop, { guild_id: guildId });
+        this.#send(ClientOpCodes.Stop, { guild_id: guildId });
     }
 
     sendSeek(data: SeekPayload) {
@@ -302,7 +283,7 @@ export class Node extends EventEmitter {
     }
 
     sendDisconnect(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Disconnect, { guild_id: guildId });
+        this.#send(ClientOpCodes.Disconnect, { guild_id: guildId });
     }
 
     sendVolume(data: VolumePayload) {
@@ -310,15 +291,15 @@ export class Node extends EventEmitter {
     }
 
     sendPlayerMigrate(guildId: string) {
-        this.#send<PlayerMigratePayload>(ClientOpCodes.PlayerMigrate, { guild_id: guildId });
+        this.#send(ClientOpCodes.PlayerMigrate, { guild_id: guildId });
     }
 
-    #send<T>(op: number, data: T) {
+    #send<T extends ClientOpCodes>(op: T, data: Extract<ClientMessage, { op: T; }>["d"]) {
         if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) {
             throw new Error(`Node ${this.name} is not connected`);
         }
 
-        const message: Message<T> = { op, d: data };
+        const message = { op, d: data };
         this.#ws.send(JSON.stringify(message));
     }
 }
