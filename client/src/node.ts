@@ -66,7 +66,6 @@ export class Node extends EventEmitter {
     #pingInterval: ReturnType<typeof setInterval> | null = null;
     #state: NodeState = NodeState.Disconnected;
     #playerCount = 0;
-    #draining = false;
 
     constructor(options: NodeOptions) {
         super();
@@ -145,7 +144,7 @@ export class Node extends EventEmitter {
     }
 
     get draining() {
-        return this.#draining;
+        return this.state === NodeState.Draining;
     }
 
     get connected() {
@@ -173,9 +172,12 @@ export class Node extends EventEmitter {
 
     #handleMessage(message: Message) {
         switch (message.op) {
-            case ServerOpCodes.Ready:
-                this.#handleReady(message.d as ReadyPayload);
+            case ServerOpCodes.Ready: {
+                const data = message.d as ReadyPayload;
+                this.#sessionId = data.session_id;
+                this.emit(EventName.Ready, data);
                 break;
+            }
             case ServerOpCodes.PlayerUpdate:
                 this.emit(EventName.PlayerUpdate, message.d as PlayerUpdatePayload);
                 break;
@@ -197,45 +199,32 @@ export class Node extends EventEmitter {
             case ServerOpCodes.Pong:
                 this.emit(EventName.Pong, undefined);
                 break;
-            case ServerOpCodes.Stats:
-                this.#handleStats(message.d as StatsPayload);
-                this.emit(EventName.Stats, message.d as StatsPayload);
+            case ServerOpCodes.Stats: {
+                const data = message.d as StatsPayload;
+                this.#playerCount = data.players;
+                this.#state = data.draining ? NodeState.Draining : NodeState.Connected;
+                this.emit(EventName.Stats, data);
                 break;
-            case ServerOpCodes.NodeDraining:
-                this.#handleNodeDraining(message.d as NodeDrainingPayload);
-                this.emit(EventName.NodeDraining, message.d as NodeDrainingPayload);
+            }
+            case ServerOpCodes.NodeDraining: {
+                const data = message.d as NodeDrainingPayload;
+                this.#state = NodeState.Draining;
+                this.emit(EventName.NodeDraining, data);
                 break;
+            }
             case ServerOpCodes.MigrateReady:
                 this.emit(EventName.MigrateReady, message.d as MigrateReadyPayload);
                 break;
         }
     }
 
-    #handleReady(data: ReadyPayload) {
-        this.#sessionId = data.session_id;
-        this.emit(EventName.Ready, data);
-    }
-
-    #handleStats(data: StatsPayload) {
-        this.#playerCount = data.players;
-        this.#draining = data.draining;
-        this.emit(EventName.Stats, data);
-    }
-
-    #handleNodeDraining(data: NodeDrainingPayload) {
-        this.#draining = true;
-        this.#state = NodeState.Draining;
-        this.emit(EventName.NodeDraining, data);
-    }
-
     #onClose(event: CloseEvent) {
         this.#state = NodeState.Disconnected;
-        this.#draining = false;
         this.#stopPingInterval();
 
         this.emit(EventName.Close, { code: event.code, reason: event.reason });
 
-        if (this.#options.autoReconnect && !this.#draining && this.#reconnectAttempts < this.#options.maxReconnectAttempts) {
+        if (this.#options.autoReconnect && !this.draining && this.#reconnectAttempts < this.#options.maxReconnectAttempts) {
             this.#scheduleReconnect();
         }
     }
