@@ -42,10 +42,29 @@ export enum PlayerState {
     Paused = "paused"
 }
 
-export interface Message<T = unknown> {
-    op: number;
-    d?: T;
-}
+export type Message =
+    | { op: ServerOpCodes.Ready; d: ReadyPayload; }
+    | { op: ServerOpCodes.PlayerUpdate; d: PlayerUpdatePayload; }
+    | { op: ServerOpCodes.TrackStart; d: TrackStartPayload; }
+    | { op: ServerOpCodes.TrackEnd; d: TrackEndPayload; }
+    | { op: ServerOpCodes.TrackError; d: TrackErrorPayload; }
+    | { op: ServerOpCodes.VoiceConnected; d: VoiceConnectPayload; }
+    | { op: ServerOpCodes.VoiceDisconnected; d: VoiceDisconnectPayload; }
+    | { op: ServerOpCodes.Pong; d?: undefined; }
+    | { op: ServerOpCodes.Stats; d: StatsPayload; }
+    | { op: ServerOpCodes.NodeDraining; d: NodeDrainingPayload; }
+    | { op: ServerOpCodes.MigrateReady; d: MigrateReadyPayload; }
+    | { op: ClientOpCodes.Identify; d: IdentifyPayload; }
+    | { op: ClientOpCodes.VoiceUpdate; d: VoiceUpdatePayload; }
+    | { op: ClientOpCodes.Play; d: PlayPayload; }
+    | { op: ClientOpCodes.Pause; d: GuildPayload; }
+    | { op: ClientOpCodes.Resume; d: GuildPayload; }
+    | { op: ClientOpCodes.Stop; d: GuildPayload; }
+    | { op: ClientOpCodes.Seek; d: SeekPayload; }
+    | { op: ClientOpCodes.Disconnect; d: GuildPayload; }
+    | { op: ClientOpCodes.Ping; d?: undefined; }
+    | { op: ClientOpCodes.Volume; d: VolumePayload; }
+    | { op: ClientOpCodes.PlayerMigrate; d: PlayerMigratePayload; };
 
 export interface IdentifyPayload {
     bot_id: string;

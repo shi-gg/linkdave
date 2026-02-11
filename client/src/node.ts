@@ -2,22 +2,9 @@ import { EventEmitter } from "node:events";
 
 import type {
     Events,
-    GuildPayload,
-    IdentifyPayload,
     Message,
-    MigrateReadyPayload,
-    NodeDrainingPayload,
-    PlayerMigratePayload,
-    PlayerUpdatePayload,
     PlayPayload,
-    ReadyPayload,
     SeekPayload,
-    StatsPayload,
-    TrackEndPayload,
-    TrackErrorPayload,
-    TrackStartPayload,
-    VoiceConnectPayload,
-    VoiceDisconnectPayload,
     VoiceUpdatePayload,
     VolumePayload
 } from "./types.js";
@@ -172,48 +159,42 @@ export class Node extends EventEmitter {
 
     #handleMessage(message: Message) {
         switch (message.op) {
-            case ServerOpCodes.Ready: {
-                const data = message.d as ReadyPayload;
-                this.#sessionId = data.session_id;
-                this.emit(EventName.Ready, data);
+            case ServerOpCodes.Ready:
+                this.#sessionId = message.d.session_id;
+                this.emit(EventName.Ready, message.d);
                 break;
-            }
             case ServerOpCodes.PlayerUpdate:
-                this.emit(EventName.PlayerUpdate, message.d as PlayerUpdatePayload);
+                this.emit(EventName.PlayerUpdate, message.d);
                 break;
             case ServerOpCodes.TrackStart:
-                this.emit(EventName.TrackStart, message.d as TrackStartPayload);
+                this.emit(EventName.TrackStart, message.d);
                 break;
             case ServerOpCodes.TrackEnd:
-                this.emit(EventName.TrackEnd, message.d as TrackEndPayload);
+                this.emit(EventName.TrackEnd, message.d);
                 break;
             case ServerOpCodes.TrackError:
-                this.emit(EventName.TrackError, message.d as TrackErrorPayload);
+                this.emit(EventName.TrackError, message.d);
                 break;
             case ServerOpCodes.VoiceConnected:
-                this.emit(EventName.VoiceConnect, message.d as VoiceConnectPayload);
+                this.emit(EventName.VoiceConnect, message.d);
                 break;
             case ServerOpCodes.VoiceDisconnected:
-                this.emit(EventName.VoiceDisconnect, message.d as VoiceDisconnectPayload);
+                this.emit(EventName.VoiceDisconnect, message.d);
                 break;
             case ServerOpCodes.Pong:
                 this.emit(EventName.Pong, undefined);
                 break;
-            case ServerOpCodes.Stats: {
-                const data = message.d as StatsPayload;
-                this.#playerCount = data.players;
-                this.#state = data.draining ? NodeState.Draining : NodeState.Connected;
-                this.emit(EventName.Stats, data);
+            case ServerOpCodes.Stats:
+                this.#playerCount = message.d.players;
+                this.#state = message.d.draining ? NodeState.Draining : NodeState.Connected;
+                this.emit(EventName.Stats, message.d);
                 break;
-            }
-            case ServerOpCodes.NodeDraining: {
-                const data = message.d as NodeDrainingPayload;
+            case ServerOpCodes.NodeDraining:
                 this.#state = NodeState.Draining;
-                this.emit(EventName.NodeDraining, data);
+                this.emit(EventName.NodeDraining, message.d);
                 break;
-            }
             case ServerOpCodes.MigrateReady:
-                this.emit(EventName.MigrateReady, message.d as MigrateReadyPayload);
+                this.emit(EventName.MigrateReady, message.d);
                 break;
         }
     }
@@ -272,7 +253,7 @@ export class Node extends EventEmitter {
     #sendIdentify() {
         if (!this.#clientId) return;
 
-        this.#send<IdentifyPayload>(ClientOpCodes.Identify, {
+        this.#send(ClientOpCodes.Identify, {
             bot_id: this.#clientId
         });
     }
@@ -286,15 +267,15 @@ export class Node extends EventEmitter {
     }
 
     sendPause(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Pause, { guild_id: guildId });
+        this.#send(ClientOpCodes.Pause, { guild_id: guildId });
     }
 
     sendResume(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Resume, { guild_id: guildId });
+        this.#send(ClientOpCodes.Resume, { guild_id: guildId });
     }
 
     sendStop(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Stop, { guild_id: guildId });
+        this.#send(ClientOpCodes.Stop, { guild_id: guildId });
     }
 
     sendSeek(data: SeekPayload) {
@@ -302,7 +283,7 @@ export class Node extends EventEmitter {
     }
 
     sendDisconnect(guildId: string) {
-        this.#send<GuildPayload>(ClientOpCodes.Disconnect, { guild_id: guildId });
+        this.#send(ClientOpCodes.Disconnect, { guild_id: guildId });
     }
 
     sendVolume(data: VolumePayload) {
@@ -310,15 +291,15 @@ export class Node extends EventEmitter {
     }
 
     sendPlayerMigrate(guildId: string) {
-        this.#send<PlayerMigratePayload>(ClientOpCodes.PlayerMigrate, { guild_id: guildId });
+        this.#send(ClientOpCodes.PlayerMigrate, { guild_id: guildId });
     }
 
-    #send<T>(op: number, data: T) {
+    #send(op: ClientOpCodes, data: unknown) {
         if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) {
             throw new Error(`Node ${this.name} is not connected`);
         }
 
-        const message: Message<T> = { op, d: data };
+        const message = { op, d: data };
         this.#ws.send(JSON.stringify(message));
     }
 }
