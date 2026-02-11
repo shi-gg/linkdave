@@ -51,7 +51,7 @@ export class LinkDaveClient extends EventEmitter {
         }
     }
 
-    addNode(options: NodeOptions): Node {
+    addNode(options: NodeOptions) {
         if (this.#nodes.has(options.name)) {
             throw new Error(`Node "${options.name}" already exists`);
         }
@@ -64,7 +64,7 @@ export class LinkDaveClient extends EventEmitter {
         return node;
     }
 
-    removeNode(name: string): boolean {
+    removeNode(name: string) {
         const node = this.#nodes.get(name);
         if (!node) return false;
 
@@ -75,15 +75,15 @@ export class LinkDaveClient extends EventEmitter {
         return true;
     }
 
-    getNode(name: string): Node | undefined {
+    getNode(name: string) {
         return this.#nodes.get(name);
     }
 
-    get nodes(): Map<string, Node> {
+    get nodes() {
         return this.#nodes;
     }
 
-    async connectAll(): Promise<void> {
+    async connectAll() {
         const promises = Array.from(this.#nodes.values(), (node) =>
             node.connect(this.#clientId).catch(() => {
                 // Ignore connection errors during initial connect
@@ -92,13 +92,13 @@ export class LinkDaveClient extends EventEmitter {
         await Promise.all(promises);
     }
 
-    disconnectAll(): void {
+    disconnectAll() {
         for (const node of this.#nodes.values()) {
             node.disconnect();
         }
     }
 
-    getBestNode(): Node | undefined {
+    getBestNode() {
         let bestNode: Node | undefined;
         let lowestCount = Infinity;
 
@@ -116,7 +116,7 @@ export class LinkDaveClient extends EventEmitter {
         return bestNode;
     }
 
-    getPlayer(guildId: string, options?: Omit<PlayerOptions, "guildId">): Player {
+    getPlayer(guildId: string, options?: Omit<PlayerOptions, "guildId">) {
         let player = this.#players.get(guildId);
         if (player) {
             return player;
@@ -134,11 +134,11 @@ export class LinkDaveClient extends EventEmitter {
         return player;
     }
 
-    getExistingPlayer(guildId: string): Player | undefined {
+    getExistingPlayer(guildId: string) {
         return this.#players.get(guildId);
     }
 
-    removePlayer(guildId: string): boolean {
+    removePlayer(guildId: string) {
         const player = this.#players.get(guildId);
         if (!player) {
             return false;
@@ -149,19 +149,19 @@ export class LinkDaveClient extends EventEmitter {
         return true;
     }
 
-    getPlayerNode(guildId: string): Node | undefined {
+    getPlayerNode(guildId: string) {
         return this.#players.get(guildId)?.node;
     }
 
-    get players(): Map<string, Player> {
+    get players() {
         return new Map(this.#players);
     }
 
-    get clientId(): string {
+    get clientId() {
         return this.#clientId;
     }
 
-    handleRaw({ t: event, d: data }: GatewayDispatchPayload): void {
+    handleRaw({ t: event, d: data }: GatewayDispatchPayload) {
         switch (event) {
             case GatewayDispatchEvents.VoiceStateUpdate: {
                 // I am not sure in what cases guild_id would be null, DMs maybe?
@@ -186,11 +186,11 @@ export class LinkDaveClient extends EventEmitter {
         }
     }
 
-    _sendToShard(guildId: string, payload: GatewayVoiceStateUpdate): void {
+    _sendToShard(guildId: string, payload: GatewayVoiceStateUpdate) {
         this.#sendToShard(guildId, payload);
     }
 
-    #setupNodeListeners(node: Node): void {
+    #setupNodeListeners(node: Node) {
         node.on(EventName.Ready, (data) => this.emit(EventName.Ready, data));
         node.on(EventName.PlayerUpdate, (data) => this.#handlePlayerUpdate(node, data));
 
@@ -222,7 +222,7 @@ export class LinkDaveClient extends EventEmitter {
         this.emit(event, data as ManagerEvents[K]);
     }
 
-    #handlePlayerUpdate(node: Node, data: PlayerUpdatePayload): void {
+    #handlePlayerUpdate(node: Node, data: PlayerUpdatePayload) {
         const player = this.#players.get(data.guild_id);
         if (player?.node !== node) return;
 
@@ -230,7 +230,7 @@ export class LinkDaveClient extends EventEmitter {
         this.emit(EventName.PlayerUpdate, data);
     }
 
-    #handleNodeDraining(node: Node, data: NodeDrainingPayload): void {
+    #handleNodeDraining(node: Node, data: NodeDrainingPayload) {
         this.emit(EventName.NodeDraining, data);
 
         for (const player of this.#players.values()) {
@@ -246,7 +246,7 @@ export class LinkDaveClient extends EventEmitter {
         }
     }
 
-    #handleMigrateReady(_node: Node, data: MigrateReadyPayload): void {
+    #handleMigrateReady(_node: Node, data: MigrateReadyPayload) {
         this.emit(EventName.MigrateReady, data);
 
         const player = this.#players.get(data.guild_id);
@@ -255,7 +255,7 @@ export class LinkDaveClient extends EventEmitter {
         player._onMigrateReady(data);
     }
 
-    #findMigrationTarget(excludeNode: Node): Node | undefined {
+    #findMigrationTarget(excludeNode: Node) {
         let bestNode: Node | undefined;
         let lowestCount = Infinity;
 
@@ -273,7 +273,7 @@ export class LinkDaveClient extends EventEmitter {
         return bestNode;
     }
 
-    _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node): void {
+    _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node) {
         const player = this.#players.get(guildId);
         if (player?.node !== oldNode) return;
 
