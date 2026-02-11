@@ -42,7 +42,7 @@ export enum PlayerState {
     Paused = "paused"
 }
 
-export type Message =
+export type ServerMessage =
     | { op: ServerOpCodes.Ready; d: ReadyPayload; }
     | { op: ServerOpCodes.PlayerUpdate; d: PlayerUpdatePayload; }
     | { op: ServerOpCodes.TrackStart; d: TrackStartPayload; }
@@ -53,7 +53,9 @@ export type Message =
     | { op: ServerOpCodes.Pong; d?: undefined; }
     | { op: ServerOpCodes.Stats; d: StatsPayload; }
     | { op: ServerOpCodes.NodeDraining; d: NodeDrainingPayload; }
-    | { op: ServerOpCodes.MigrateReady; d: MigrateReadyPayload; }
+    | { op: ServerOpCodes.MigrateReady; d: MigrateReadyPayload; };
+
+export type ClientMessage =
     | { op: ClientOpCodes.Identify; d: IdentifyPayload; }
     | { op: ClientOpCodes.VoiceUpdate; d: VoiceUpdatePayload; }
     | { op: ClientOpCodes.Play; d: PlayPayload; }

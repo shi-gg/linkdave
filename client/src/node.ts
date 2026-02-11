@@ -1,10 +1,10 @@
 import { EventEmitter } from "node:events";
 
 import type {
-    Events,
-    Message,
+    ClientMessage, Events,
     PlayPayload,
     SeekPayload,
+    ServerMessage,
     VoiceUpdatePayload,
     VolumePayload
 } from "./types.js";
@@ -150,14 +150,14 @@ export class Node extends EventEmitter {
 
     #onMessage(event: MessageEvent) {
         try {
-            const message = JSON.parse(event.data as string) as Message;
+            const message = JSON.parse(event.data as string) as ServerMessage;
             this.#handleMessage(message);
         } catch {
             // Invalid messages are silently ignored
         }
     }
 
-    #handleMessage(message: Message) {
+    #handleMessage(message: ServerMessage) {
         switch (message.op) {
             case ServerOpCodes.Ready:
                 this.#sessionId = message.d.session_id;
@@ -294,7 +294,7 @@ export class Node extends EventEmitter {
         this.#send(ClientOpCodes.PlayerMigrate, { guild_id: guildId });
     }
 
-    #send(op: ClientOpCodes, data: unknown) {
+    #send<T extends ClientOpCodes>(op: T, data: Extract<ClientMessage, { op: T; }>["d"]) {
         if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) {
             throw new Error(`Node ${this.name} is not connected`);
         }
