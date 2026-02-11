@@ -4,11 +4,13 @@ import type { LinkDaveClient } from "./client.js";
 import type { Node } from "./node.js";
 import type {
     MigrateReadyPayload,
-    PlayerState,
     PlayerUpdatePayload,
     PlayPayload,
     TrackInfo,
     VoiceServerEvent
+} from "./types.js";
+import {
+    PlayerState
 } from "./types.js";
 
 export interface PlayOptions {
@@ -45,7 +47,7 @@ export class Player {
     #voiceChannelId: string | null = null;
     #selfMute: boolean;
     #selfDeaf: boolean;
-    #state: PlayerState = "idle";
+    #state: PlayerState = PlayerState.Idle;
     #position = 0;
     #volume = 100;
     #currentTrack: TrackInfo | null = null;
@@ -96,11 +98,11 @@ export class Player {
     }
 
     get playing() {
-        return this.#state === "playing";
+        return this.#state === PlayerState.Playing;
     }
 
     get paused() {
-        return this.#state === "paused";
+        return this.#state === PlayerState.Paused;
     }
 
     connect(channelId?: string) {
@@ -134,7 +136,7 @@ export class Player {
         });
 
         this.#voiceChannelId = null;
-        this.#state = "idle";
+        this.#state = PlayerState.Idle;
         this.#currentTrack = null;
         this.#position = 0;
         this.#voiceState = null;
@@ -224,7 +226,7 @@ export class Player {
     stop() {
         this.#node.sendStop(this.#guildId);
         this.#currentTrack = null;
-        this.#state = "idle";
+        this.#state = PlayerState.Idle;
         this.#position = 0;
     }
 
@@ -296,7 +298,7 @@ export class Player {
             });
         }
 
-        if (data.state === "playing" && data.url) {
+        if (data.state === PlayerState.Playing && data.url) {
             this.#node.sendPlay({
                 guild_id: this.#guildId,
                 url: data.url,

@@ -28,9 +28,19 @@ export enum ServerOpCodes {
     MigrateReady = 10
 }
 
-export type TrackEndReason = "finished" | "stopped" | "replaced" | "error" | "cleanup";
+export enum TrackEndReason {
+    Finished = "finished",
+    Stopped = "stopped",
+    Replaced = "replaced",
+    Error = "error",
+    Cleanup = "cleanup"
+}
 
-export type PlayerState = "idle" | "playing" | "paused";
+export enum PlayerState {
+    Idle = "idle",
+    Playing = "playing",
+    Paused = "paused"
+}
 
 export interface Message<T = unknown> {
     op: number;
