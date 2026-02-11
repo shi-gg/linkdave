@@ -38,7 +38,6 @@ export class LinkDaveClient extends EventEmitter {
     readonly #sendToShard: SendToShardFn;
     readonly #nodes = new Map<string, Node>();
     readonly #players = new Map<string, Player>();
-    readonly #playerNodes = new Map<string, Node>();
 
     constructor(options: LinkDaveClientOptions) {
         super();
@@ -130,7 +129,6 @@ export class LinkDaveClient extends EventEmitter {
 
         player = new Player(this, guildId, node, options);
         this.#players.set(guildId, player);
-        this.#playerNodes.set(guildId, node);
         node.incrementPlayerCount();
 
         return player;
@@ -146,18 +144,13 @@ export class LinkDaveClient extends EventEmitter {
             return false;
         }
 
-        const node = this.#playerNodes.get(guildId);
-        if (node) {
-            node.decrementPlayerCount();
-        }
-
+        player.node.decrementPlayerCount();
         this.#players.delete(guildId);
-        this.#playerNodes.delete(guildId);
         return true;
     }
 
     getPlayerNode(guildId: string): Node | undefined {
-        return this.#playerNodes.get(guildId);
+        return this.#players.get(guildId)?.node;
     }
 
     get players(): Map<string, Player> {
@@ -223,29 +216,25 @@ export class LinkDaveClient extends EventEmitter {
         event: K,
         data: Events[K]
     ) {
-        if (this.#playerNodes.get(guildId) !== node) return;
+        const player = this.#players.get(guildId);
+        if (player?.node !== node) return;
+
         this.emit(event, data as ManagerEvents[K]);
     }
 
     #handlePlayerUpdate(node: Node, data: PlayerUpdatePayload): void {
-        if (this.#playerNodes.get(data.guild_id) !== node) {
-            return;
-        }
-
         const player = this.#players.get(data.guild_id);
-        if (player) player._updateState(data);
+        if (player?.node !== node) return;
 
+        player._updateState(data);
         this.emit(EventName.PlayerUpdate, data);
     }
 
     #handleNodeDraining(node: Node, data: NodeDrainingPayload): void {
         this.emit(EventName.NodeDraining, data);
 
-        for (const [guildId, playerNode] of this.#playerNodes) {
-            if (playerNode !== node) continue;
-
-            const player = this.#players.get(guildId);
-            if (!player) continue;
+        for (const player of this.#players.values()) {
+            if (player.node !== node) continue;
 
             const targetNode = this.#findMigrationTarget(node);
             if (!targetNode) {
@@ -285,10 +274,10 @@ export class LinkDaveClient extends EventEmitter {
     }
 
     _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node): void {
-        if (this.#playerNodes.get(guildId) !== oldNode) return;
+        const player = this.#players.get(guildId);
+        if (player?.node !== oldNode) return;
 
         oldNode.decrementPlayerCount();
-        this.#playerNodes.set(guildId, newNode);
         newNode.incrementPlayerCount();
     }
 }

@@ -283,8 +283,9 @@ export class Player {
         const oldNode = this.#node;
 
         // Don't send disconnect to old node - we're migrating
-        this.#node = targetNode;
+        // Don't send disconnect to old node - we're migrating
         this.#client._updatePlayerNode(this.#guildId, oldNode, targetNode);
+        this.#node = targetNode;
 
         if (this.#voiceState) {
             this.#node.sendVoiceUpdate({
