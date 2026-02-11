@@ -39,7 +39,7 @@ export interface Node {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node extends EventEmitter {
-    private static readonly NODE_PING_TIMEOUT = 30_000;
+    private static readonly NODE_PING_INTERVAL = 30_000;
 
     readonly name: string;
     readonly url: string;
@@ -238,7 +238,7 @@ export class Node extends EventEmitter {
     #startPingInterval() {
         this.#pingInterval = setInterval(
             () => this.#send(ClientOpCodes.Ping, undefined),
-            Node.NODE_PING_TIMEOUT
+            Node.NODE_PING_INTERVAL
         );
     }
 
