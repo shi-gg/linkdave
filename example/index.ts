@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
-import { LinkDaveClient } from "linkdave";
+import { EventName, LinkDaveClient } from "linkdave";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN!;
 if (!DISCORD_TOKEN) {
@@ -24,14 +24,14 @@ const linkdave = new LinkDaveClient({
     }
 });
 
-discord.on("raw", (packet) => linkdave.handleRaw(packet));
+discord.on(Events.Raw, (packet) => linkdave.handleRaw(packet));
 
-linkdave.on("ready", (d) => console.log(`LinkDave session: ${d.session_id}`));
-linkdave.on("trackStart", (d) => console.log(`Playing: ${d.track.url}`));
-linkdave.on("trackEnd", (d) => console.log(`Track ended: ${d.reason}`));
-linkdave.on("trackError", (d) => console.error(`Error: ${d.error}`));
-linkdave.on("voiceConnected", (d) => console.log(`Voice connected: ${d.channel_id}`));
-linkdave.on("error", console.error);
+linkdave.on(EventName.Ready, (d) => console.log(`LinkDave session: ${d.session_id}`));
+linkdave.on(EventName.TrackStart, (d) => console.log(`Playing: ${d.track.url}`));
+linkdave.on(EventName.TrackEnd, (d) => console.log(`Track ended: ${d.reason}`));
+linkdave.on(EventName.TrackError, (d) => console.error(`Error: ${d.error}`));
+linkdave.on(EventName.VoiceConnect, (d) => console.log(`Voice connected: ${d.channel_id}`));
+linkdave.on(EventName.Error, console.error);
 
 discord.on(Events.ClientReady, async () => {
     console.log(`Bot ready as ${discord.user?.tag}`);
@@ -62,11 +62,7 @@ discord.on(Events.MessageCreate, async (msg) => {
     if (cmd === "!resume") linkdave.getExistingPlayer(msg.guild.id)?.resume();
     if (cmd === "!stop") linkdave.getExistingPlayer(msg.guild.id)?.stop();
     if (cmd === "!leave") linkdave.getExistingPlayer(msg.guild.id)?.destroy();
-
-    if (cmd === "!volume" && args[0]) {
-        const vol = Math.min(1000, Math.max(0, parseInt(args[0], 10) * 10));
-        linkdave.getExistingPlayer(msg.guild.id)?.setVolume(vol);
-    }
+    if (cmd === "!volume" && args[0]) linkdave.getExistingPlayer(msg.guild.id)?.setVolume(parseInt(args[0], 10) * 10);
 });
 
 process.on("SIGINT", () => {
