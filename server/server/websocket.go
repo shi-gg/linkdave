@@ -83,8 +83,7 @@ func (s *Server) OnTrackEnd(clientId, guildID snowflake.ID, source audio.Source,
 		}
 
 		if reason != protocol.TrackEndReasonReplaced && reason != protocol.TrackEndReasonStopped {
-			player.state = protocol.PlayerStateIdle
-			player.currentURL = ""
+			player.SetIdleState()
 		}
 
 		client.send(protocol.Message{
@@ -274,7 +273,7 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.channelID = update.ChannelID
+	player.SetChannelID(update.ChannelID)
 
 	client.send(protocol.Message{
 		Op: protocol.OpVoiceConnect,
@@ -294,7 +293,7 @@ func (s *Server) handlePlay(client *Client, data json.RawMessage) {
 
 	player := client.getOrCreatePlayer(play.GuildID)
 	if play.Volume > 0 {
-		player.volume = play.Volume
+		player.SetVolume(play.Volume)
 	}
 
 	s.logger.Info("play requested",
@@ -317,11 +316,9 @@ func (s *Server) handlePlay(client *Client, data json.RawMessage) {
 			return
 		}
 
-		player.state = protocol.PlayerStatePlaying
-		player.currentURL = play.URL
-		player.startedAt = time.Now()
-		player.position = play.StartTime
+		player.SetPlayingState(play.URL, play.StartTime)
 
+		state, position, volume := player.GetPlayerUpdateData()
 		client.send(protocol.Message{
 			Op: protocol.OpTrackStart,
 			Data: protocol.TrackStartData{
@@ -337,9 +334,9 @@ func (s *Server) handlePlay(client *Client, data json.RawMessage) {
 			Op: protocol.OpPlayerUpdate,
 			Data: protocol.PlayerUpdateData{
 				GuildID:  play.GuildID,
-				State:    player.state,
-				Position: player.position,
-				Volume:   player.volume,
+				State:    state,
+				Position: position,
+				Volume:   volume,
 			},
 		})
 	}()
@@ -362,16 +359,16 @@ func (s *Server) handlePause(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.state = protocol.PlayerStatePaused
-	player.position = s.voiceManager.Position(client.clientId, guild.GuildID)
+	player.SetPausedState(s.voiceManager.Position(client.clientId, guild.GuildID))
 
+	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
 			GuildID:  guild.GuildID,
-			State:    player.state,
-			Position: player.position,
-			Volume:   player.volume,
+			State:    state,
+			Position: position,
+			Volume:   volume,
 		},
 	})
 }
@@ -393,17 +390,18 @@ func (s *Server) handleResume(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.state = protocol.PlayerStatePlaying
-	player.startedAt = time.Now()
-	player.position = s.voiceManager.Position(client.clientId, guild.GuildID)
+	player.SetState(protocol.PlayerStatePlaying)
+	player.SetStartedAt(time.Now())
+	player.SetPosition(s.voiceManager.Position(client.clientId, guild.GuildID))
 
+	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
 			GuildID:  guild.GuildID,
-			State:    player.state,
-			Position: player.position,
-			Volume:   player.volume,
+			State:    state,
+			Position: position,
+			Volume:   volume,
 		},
 	})
 }
@@ -425,16 +423,16 @@ func (s *Server) handleStop(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.state = protocol.PlayerStateIdle
-	player.currentURL = ""
+	player.SetIdleState()
 
+	state, _, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
 			GuildID:  guild.GuildID,
-			State:    player.state,
+			State:    state,
 			Position: 0,
-			Volume:   player.volume,
+			Volume:   volume,
 		},
 	})
 }
@@ -456,16 +454,17 @@ func (s *Server) handleSeek(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.position = s.voiceManager.Position(client.clientId, seek.GuildID)
-	player.startedAt = time.Now()
+	player.SetPosition(s.voiceManager.Position(client.clientId, seek.GuildID))
+	player.SetStartedAt(time.Now())
 
+	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
 			GuildID:  seek.GuildID,
-			State:    player.state,
-			Position: player.position,
-			Volume:   player.volume,
+			State:    state,
+			Position: position,
+			Volume:   volume,
 		},
 	})
 }
@@ -512,15 +511,16 @@ func (s *Server) handleVolume(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.volume = vol.Volume
+	player.SetVolume(vol.Volume)
 
+	state, _, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
 			GuildID:  vol.GuildID,
-			State:    player.state,
+			State:    state,
 			Position: s.voiceManager.Position(client.clientId, vol.GuildID),
-			Volume:   player.volume,
+			Volume:   volume,
 		},
 	})
 }
@@ -536,7 +536,7 @@ func (s *Server) GetStats() protocol.StatsData {
 		client.playersMu.RLock()
 		totalPlayers += len(client.players)
 		for _, p := range client.players {
-			if p.state == protocol.PlayerStatePlaying {
+			if p.GetState() == protocol.PlayerStatePlaying {
 				playingTracks++
 			}
 		}
@@ -608,20 +608,21 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 		return
 	}
 
+	url, position, volume, state := player.GetMigrateData()
 	client.send(protocol.Message{
 		Op: protocol.OpMigrateReady,
 		Data: protocol.MigrateReadyData{
 			GuildID:  migrate.GuildID,
-			URL:      player.currentURL,
-			Position: time.Since(player.startedAt).Milliseconds() + player.position,
-			Volume:   player.volume,
-			State:    player.state,
+			URL:      url,
+			Position: position,
+			Volume:   volume,
+			State:    state,
 		},
 	})
 
 	s.logger.Info("player migration state sent",
 		slog.String("guild_id", migrate.GuildID.String()),
-		slog.String("url", player.currentURL),
+		slog.String("url", url),
 	)
 }
 

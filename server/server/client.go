@@ -20,6 +20,7 @@ const (
 )
 
 type Player struct {
+	mutex      sync.RWMutex
 	guildID    snowflake.ID
 	channelID  snowflake.ID
 	state      string
@@ -165,4 +166,112 @@ func (c *Client) removePlayer(guildID snowflake.ID) {
 	c.playersMu.Lock()
 	defer c.playersMu.Unlock()
 	delete(c.players, guildID)
+}
+
+func (p *Player) GetState() string {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.state
+}
+
+func (p *Player) SetState(state string) {
+	p.mutex.Lock()
+	p.state = state
+	p.mutex.Unlock()
+}
+
+func (p *Player) GetCurrentURL() string {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.currentURL
+}
+
+func (p *Player) SetCurrentURL(url string) {
+	p.mutex.Lock()
+	p.currentURL = url
+	p.mutex.Unlock()
+}
+
+func (p *Player) GetPosition() int64 {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.position
+}
+
+func (p *Player) SetPosition(pos int64) {
+	p.mutex.Lock()
+	p.position = pos
+	p.mutex.Unlock()
+}
+
+func (p *Player) GetVolume() int {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.volume
+}
+
+func (p *Player) SetVolume(vol int) {
+	p.mutex.Lock()
+	p.volume = vol
+	p.mutex.Unlock()
+}
+
+func (p *Player) GetStartedAt() time.Time {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.startedAt
+}
+
+func (p *Player) SetStartedAt(t time.Time) {
+	p.mutex.Lock()
+	p.startedAt = t
+	p.mutex.Unlock()
+}
+
+func (p *Player) GetChannelID() snowflake.ID {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.channelID
+}
+
+func (p *Player) SetChannelID(id snowflake.ID) {
+	p.mutex.Lock()
+	p.channelID = id
+	p.mutex.Unlock()
+}
+
+func (p *Player) SetPlayingState(url string, position int64) {
+	p.mutex.Lock()
+	p.state = protocol.PlayerStatePlaying
+	p.currentURL = url
+	p.position = position
+	p.startedAt = time.Now()
+	p.mutex.Unlock()
+}
+
+func (p *Player) SetIdleState() {
+	p.mutex.Lock()
+	p.state = protocol.PlayerStateIdle
+	p.currentURL = ""
+	p.mutex.Unlock()
+}
+
+func (p *Player) SetPausedState(position int64) {
+	p.mutex.Lock()
+	p.state = protocol.PlayerStatePaused
+	p.position = position
+	p.mutex.Unlock()
+}
+
+func (p *Player) GetPlayerUpdateData() (state string, position int64, volume int) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.state, p.position, p.volume
+}
+
+func (p *Player) GetMigrateData() (url string, position int64, volume int, state string) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	calculatedPos := time.Since(p.startedAt).Milliseconds() + p.position
+	return p.currentURL, calculatedPos, p.volume, p.state
 }
