@@ -72,7 +72,7 @@ func (s *Server) sendStats() {
 
 func (s *Server) OnTrackEnd(clientId, guildID snowflake.ID, source audio.Source, reason string) {
 	s.clientsMu.RLock()
-	clients := s.clientsByClientId[clientId]
+	clients := append([]*Client(nil), s.clientsByClientId[clientId]...)
 	s.clientsMu.RUnlock()
 
 	for _, client := range clients {
@@ -101,7 +101,7 @@ func (s *Server) OnTrackEnd(clientId, guildID snowflake.ID, source audio.Source,
 
 func (s *Server) OnTrackException(clientId, guildID snowflake.ID, source audio.Source, err error) {
 	s.clientsMu.RLock()
-	clients := s.clientsByClientId[clientId]
+	clients := append([]*Client(nil), s.clientsByClientId[clientId]...)
 	s.clientsMu.RUnlock()
 
 	for _, client := range clients {
@@ -121,7 +121,7 @@ func (s *Server) OnTrackException(clientId, guildID snowflake.ID, source audio.S
 
 func (s *Server) OnVoiceDisconnected(clientId, guildID snowflake.ID) {
 	s.clientsMu.RLock()
-	clients := s.clientsByClientId[clientId]
+	clients := append([]*Client(nil), s.clientsByClientId[clientId]...)
 	s.clientsMu.RUnlock()
 
 	for _, client := range clients {
