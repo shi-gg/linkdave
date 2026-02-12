@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -42,8 +45,35 @@ type MP3Source struct {
 	mutex    sync.Mutex
 }
 
-func NewMP3Source(ctx context.Context, url string, startTimeMs int64) (*MP3Source, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+func NewMP3Source(ctx context.Context, urlStr string, startTimeMs int64) (*MP3Source, error) {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse URL: %w", err)
+	}
+
+	switch parsedURL.Scheme {
+	case "http":
+		if !config.HTTPEnabled {
+			return nil, fmt.Errorf("http scheme is disabled")
+		}
+	case "https":
+		if !config.HTTPSEnabled {
+			return nil, fmt.Errorf("https scheme is disabled")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported URL scheme: %s", parsedURL.Scheme)
+	}
+
+	host := parsedURL.Hostname()
+	if host == "" {
+		return nil, fmt.Errorf("empty hostname")
+	}
+
+	if err := validateHost(host); err != nil {
+		return nil, fmt.Errorf("invalid host: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -58,7 +88,45 @@ func NewMP3Source(ctx context.Context, url string, startTimeMs int64) (*MP3Sourc
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
 
-	return NewMP3SourceFromReader(resp.Body, url, startTimeMs)
+	return NewMP3SourceFromReader(resp.Body, urlStr, startTimeMs)
+}
+
+func validateHost(host string) error {
+	if config.PrivateIPAddressEnabled && config.PublicIPAddressEnabled {
+		return nil
+	}
+
+	if strings.ToLower(host) == "localhost" {
+		if !config.PrivateIPAddressEnabled {
+			return fmt.Errorf("localhost not allowed")
+		}
+		return nil
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve host: %w", err)
+		}
+		if len(ips) == 0 {
+			return fmt.Errorf("no IPs resolved for host")
+		}
+		ip = ips[0]
+	}
+
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		if !config.PrivateIPAddressEnabled {
+			return fmt.Errorf("private IP address not allowed")
+		}
+		return nil
+	}
+
+	if !config.PublicIPAddressEnabled {
+		return fmt.Errorf("public IP address not allowed")
+	}
+
+	return nil
 }
 
 func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64) (*MP3Source, error) {
