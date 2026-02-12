@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/gorilla/websocket"
+	"github.com/shi-gg/linkdave/server/audio"
 	"github.com/shi-gg/linkdave/server/protocol"
 	"github.com/shi-gg/linkdave/server/voice"
 )
@@ -23,21 +25,115 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	logger       *slog.Logger
-	voiceManager *voice.Manager
-	clients      map[string]*Client
-	clientsMu    sync.RWMutex
-	startTime    time.Time
-	draining     bool
-	drainMu      sync.RWMutex
+	logger            *slog.Logger
+	voiceManager      *voice.Manager
+	clients           map[string]*Client
+	clientsByClientId map[snowflake.ID][]*Client
+	clientsMu         sync.RWMutex
+	startTime         time.Time
+	draining          bool
+	drainMu           sync.RWMutex
 }
 
 func NewServer(logger *slog.Logger, voiceManager *voice.Manager) *Server {
-	return &Server{
-		logger:       logger,
-		voiceManager: voiceManager,
-		clients:      make(map[string]*Client),
-		startTime:    time.Now(),
+	s := &Server{
+		logger:            logger,
+		voiceManager:      voiceManager,
+		clients:           make(map[string]*Client),
+		clientsByClientId: make(map[snowflake.ID][]*Client),
+		startTime:         time.Now(),
+	}
+	voiceManager.SetEventHandler(s)
+	s.startTickers()
+	return s
+}
+
+func (s *Server) startTickers() {
+	ticker := time.NewTicker(5 * time.Second)
+	go func() {
+		for range ticker.C {
+			s.sendStats()
+		}
+	}()
+}
+
+func (s *Server) sendStats() {
+	stats := s.GetStats()
+	s.clientsMu.RLock()
+	defer s.clientsMu.RUnlock()
+
+	for _, client := range s.clients {
+		client.send(protocol.Message{
+			Op:   protocol.OpStats,
+			Data: stats,
+		})
+	}
+}
+
+func (s *Server) OnTrackEnd(clientId, guildID snowflake.ID, source audio.Source, reason string) {
+	s.clientsMu.RLock()
+	clients := append([]*Client(nil), s.clientsByClientId[clientId]...)
+	s.clientsMu.RUnlock()
+
+	for _, client := range clients {
+		player := client.getPlayer(guildID)
+		if player == nil {
+			continue
+		}
+
+		if reason != protocol.TrackEndReasonReplaced && reason != protocol.TrackEndReasonStopped {
+			player.SetIdleState()
+		}
+
+		client.send(protocol.Message{
+			Op: protocol.OpTrackEnd,
+			Data: protocol.TrackEndData{
+				GuildID: guildID,
+				Track: protocol.TrackInfo{
+					URL:      source.URL(),
+					Duration: source.Duration(),
+				},
+				Reason: reason,
+			},
+		})
+	}
+}
+
+func (s *Server) OnTrackException(clientId, guildID snowflake.ID, source audio.Source, err error) {
+	s.clientsMu.RLock()
+	clients := append([]*Client(nil), s.clientsByClientId[clientId]...)
+	s.clientsMu.RUnlock()
+
+	for _, client := range clients {
+		client.send(protocol.Message{
+			Op: protocol.OpTrackError,
+			Data: protocol.TrackErrorData{
+				GuildID: guildID,
+				Track: protocol.TrackInfo{
+					URL:      source.URL(),
+					Duration: source.Duration(),
+				},
+				Error: err.Error(),
+			},
+		})
+	}
+}
+
+func (s *Server) OnVoiceDisconnected(clientId, guildID snowflake.ID) {
+	s.clientsMu.RLock()
+	clients := append([]*Client(nil), s.clientsByClientId[clientId]...)
+	s.clientsMu.RUnlock()
+
+	for _, client := range clients {
+		client.removePlayer(guildID)
+
+		client.send(protocol.Message{
+			Op: protocol.OpVoiceDisconnect,
+			Data: protocol.VoiceDisconnectData{
+				GuildID: guildID,
+				Reason:  "connection_lost",
+			},
+		})
 	}
 }
 
@@ -64,12 +160,23 @@ func (s *Server) registerClient(client *Client) {
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 	s.clients[client.sessionID] = client
+	s.clientsByClientId[client.clientId] = append(s.clientsByClientId[client.clientId], client)
 }
 
 func (s *Server) unregisterClient(client *Client) {
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 	delete(s.clients, client.sessionID)
+	clients := s.clientsByClientId[client.clientId]
+	for i, c := range clients {
+		if c == client {
+			s.clientsByClientId[client.clientId] = append(clients[:i], clients[i+1:]...)
+			break
+		}
+	}
+	if len(s.clientsByClientId[client.clientId]) == 0 {
+		delete(s.clientsByClientId, client.clientId)
+	}
 }
 
 func (s *Server) handleMessage(client *Client, msgType int, data []byte) {
@@ -170,11 +277,11 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.channelID = update.ChannelID
+	player.SetChannelID(update.ChannelID)
 
 	client.send(protocol.Message{
-		Op: protocol.OpVoiceConnected,
-		Data: protocol.VoiceConnectedData{
+		Op: protocol.OpVoiceConnect,
+		Data: protocol.VoiceConnectData{
 			GuildID:   update.GuildID,
 			ChannelID: update.ChannelID,
 		},
@@ -190,7 +297,7 @@ func (s *Server) handlePlay(client *Client, data json.RawMessage) {
 
 	player := client.getOrCreatePlayer(play.GuildID)
 	if play.Volume > 0 {
-		player.volume = play.Volume
+		player.SetVolume(play.Volume)
 	}
 
 	s.logger.Info("play requested",
@@ -199,7 +306,7 @@ func (s *Server) handlePlay(client *Client, data json.RawMessage) {
 	)
 
 	go func() {
-		err := s.voiceManager.Play(context.Background(), client.clientId, play.GuildID, play.URL, play.StartTime)
+		source, err := s.voiceManager.Play(context.Background(), client.clientId, play.GuildID, play.URL, play.StartTime)
 		if err != nil {
 			s.logger.Error("playback failed", slog.Any("error", err))
 			client.send(protocol.Message{
@@ -213,14 +320,27 @@ func (s *Server) handlePlay(client *Client, data json.RawMessage) {
 			return
 		}
 
-		player.state = protocol.PlayerStatePlaying
-		player.currentURL = play.URL
+		player.SetPlayingState(play.URL, play.StartTime)
 
+		state, position, volume := player.GetPlayerUpdateData()
 		client.send(protocol.Message{
 			Op: protocol.OpTrackStart,
 			Data: protocol.TrackStartData{
 				GuildID: play.GuildID,
-				Track:   protocol.TrackInfo{URL: play.URL},
+				Track: protocol.TrackInfo{
+					URL:      source.URL(),
+					Duration: source.Duration(),
+				},
+			},
+		})
+
+		client.send(protocol.Message{
+			Op: protocol.OpPlayerUpdate,
+			Data: protocol.PlayerUpdateData{
+				GuildID:  play.GuildID,
+				State:    state,
+				Position: position,
+				Volume:   volume,
 			},
 		})
 	}()
@@ -243,7 +363,18 @@ func (s *Server) handlePause(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.state = protocol.PlayerStatePaused
+	player.SetPausedState(s.voiceManager.Position(client.clientId, guild.GuildID))
+
+	state, position, volume := player.GetPlayerUpdateData()
+	client.send(protocol.Message{
+		Op: protocol.OpPlayerUpdate,
+		Data: protocol.PlayerUpdateData{
+			GuildID:  guild.GuildID,
+			State:    state,
+			Position: position,
+			Volume:   volume,
+		},
+	})
 }
 
 func (s *Server) handleResume(client *Client, data json.RawMessage) {
@@ -263,7 +394,20 @@ func (s *Server) handleResume(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.state = protocol.PlayerStatePlaying
+	player.SetState(protocol.PlayerStatePlaying)
+	player.SetStartedAt(time.Now())
+	player.SetPosition(s.voiceManager.Position(client.clientId, guild.GuildID))
+
+	state, position, volume := player.GetPlayerUpdateData()
+	client.send(protocol.Message{
+		Op: protocol.OpPlayerUpdate,
+		Data: protocol.PlayerUpdateData{
+			GuildID:  guild.GuildID,
+			State:    state,
+			Position: position,
+			Volume:   volume,
+		},
+	})
 }
 
 func (s *Server) handleStop(client *Client, data json.RawMessage) {
@@ -283,8 +427,18 @@ func (s *Server) handleStop(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.state = protocol.PlayerStateIdle
-	player.currentURL = ""
+	player.SetIdleState()
+
+	state, _, volume := player.GetPlayerUpdateData()
+	client.send(protocol.Message{
+		Op: protocol.OpPlayerUpdate,
+		Data: protocol.PlayerUpdateData{
+			GuildID:  guild.GuildID,
+			State:    state,
+			Position: 0,
+			Volume:   volume,
+		},
+	})
 }
 
 func (s *Server) handleSeek(client *Client, data json.RawMessage) {
@@ -294,9 +448,29 @@ func (s *Server) handleSeek(client *Client, data json.RawMessage) {
 		return
 	}
 
+	player := client.getPlayer(seek.GuildID)
+	if player == nil {
+		return
+	}
+
 	if err := s.voiceManager.Seek(client.clientId, seek.GuildID, seek.Position); err != nil {
 		s.logger.Error("failed to seek", slog.Any("error", err))
+		return
 	}
+
+	player.SetPosition(s.voiceManager.Position(client.clientId, seek.GuildID))
+	player.SetStartedAt(time.Now())
+
+	state, position, volume := player.GetPlayerUpdateData()
+	client.send(protocol.Message{
+		Op: protocol.OpPlayerUpdate,
+		Data: protocol.PlayerUpdateData{
+			GuildID:  seek.GuildID,
+			State:    state,
+			Position: position,
+			Volume:   volume,
+		},
+	})
 }
 
 func (s *Server) handleDisconnect(client *Client, data json.RawMessage) {
@@ -314,8 +488,8 @@ func (s *Server) handleDisconnect(client *Client, data json.RawMessage) {
 	client.removePlayer(guild.GuildID)
 
 	client.send(protocol.Message{
-		Op: protocol.OpVoiceDisconnected,
-		Data: protocol.VoiceDisconnectedData{
+		Op: protocol.OpVoiceDisconnect,
+		Data: protocol.VoiceDisconnectData{
 			GuildID: guild.GuildID,
 			Reason:  "requested",
 		},
@@ -341,7 +515,18 @@ func (s *Server) handleVolume(client *Client, data json.RawMessage) {
 		return
 	}
 
-	player.volume = vol.Volume
+	player.SetVolume(vol.Volume)
+
+	state, _, volume := player.GetPlayerUpdateData()
+	client.send(protocol.Message{
+		Op: protocol.OpPlayerUpdate,
+		Data: protocol.PlayerUpdateData{
+			GuildID:  vol.GuildID,
+			State:    state,
+			Position: s.voiceManager.Position(client.clientId, vol.GuildID),
+			Volume:   volume,
+		},
+	})
 }
 
 func (s *Server) GetStats() protocol.StatsData {
@@ -355,24 +540,22 @@ func (s *Server) GetStats() protocol.StatsData {
 		client.playersMu.RLock()
 		totalPlayers += len(client.players)
 		for _, p := range client.players {
-			if p.state == protocol.PlayerStatePlaying {
+			if p.GetState() == protocol.PlayerStatePlaying {
 				playingTracks++
 			}
 		}
 		client.playersMu.RUnlock()
 	}
 
-	var memStats struct {
-		Alloc      uint64
-		TotalAlloc uint64
-	}
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
 
 	return protocol.StatsData{
 		Players:       totalPlayers,
 		PlayingTracks: playingTracks,
 		Uptime:        time.Since(s.startTime).Milliseconds(),
-		MemoryUsed:    memStats.Alloc,
-		MemoryAlloc:   memStats.TotalAlloc,
+		MemoryUsed:    m.Alloc,
+		MemoryAlloc:   m.TotalAlloc,
 		Draining:      s.draining,
 	}
 }
@@ -429,20 +612,21 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 		return
 	}
 
+	url, position, volume, state := player.GetMigrateData()
 	client.send(protocol.Message{
 		Op: protocol.OpMigrateReady,
 		Data: protocol.MigrateReadyData{
 			GuildID:  migrate.GuildID,
-			URL:      player.currentURL,
-			Position: time.Since(player.startedAt).Milliseconds() + player.position,
-			Volume:   player.volume,
-			State:    player.state,
+			URL:      url,
+			Position: position,
+			Volume:   volume,
+			State:    state,
 		},
 	})
 
 	s.logger.Info("player migration state sent",
 		slog.String("guild_id", migrate.GuildID.String()),
-		slog.String("url", player.currentURL),
+		slog.String("url", url),
 	)
 }
 

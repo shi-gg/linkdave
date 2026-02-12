@@ -20,8 +20,8 @@ export enum ServerOpCodes {
     TrackStart = 2,
     TrackEnd = 3,
     TrackError = 4,
-    VoiceConnected = 5,
-    VoiceDisconnected = 6,
+    VoiceConnect = 5,
+    VoiceDisconnect = 6,
     Pong = 7,
     Stats = 8,
     NodeDraining = 9,
@@ -48,8 +48,8 @@ export type ServerMessage =
     | { op: ServerOpCodes.TrackStart; d: TrackStartPayload; }
     | { op: ServerOpCodes.TrackEnd; d: TrackEndPayload; }
     | { op: ServerOpCodes.TrackError; d: TrackErrorPayload; }
-    | { op: ServerOpCodes.VoiceConnected; d: VoiceConnectPayload; }
-    | { op: ServerOpCodes.VoiceDisconnected; d: VoiceDisconnectPayload; }
+    | { op: ServerOpCodes.VoiceConnect; d: VoiceConnectPayload; }
+    | { op: ServerOpCodes.VoiceDisconnect; d: VoiceDisconnectPayload; }
     | { op: ServerOpCodes.Pong; d?: undefined; }
     | { op: ServerOpCodes.Stats; d: StatsPayload; }
     | { op: ServerOpCodes.NodeDraining; d: NodeDrainingPayload; }
@@ -121,7 +121,7 @@ export interface PlayerUpdatePayload {
 export interface TrackInfo {
     url: string;
     title?: string;
-    duration?: number;
+    duration: number;
 }
 
 export interface TrackStartPayload {

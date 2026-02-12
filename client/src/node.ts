@@ -175,10 +175,10 @@ export class Node extends EventEmitter {
             case ServerOpCodes.TrackError:
                 this.emit(EventName.TrackError, message.d);
                 break;
-            case ServerOpCodes.VoiceConnected:
+            case ServerOpCodes.VoiceConnect:
                 this.emit(EventName.VoiceConnect, message.d);
                 break;
-            case ServerOpCodes.VoiceDisconnected:
+            case ServerOpCodes.VoiceDisconnect:
                 this.emit(EventName.VoiceDisconnect, message.d);
                 break;
             case ServerOpCodes.Pong:

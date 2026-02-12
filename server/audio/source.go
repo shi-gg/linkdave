@@ -12,6 +12,7 @@ type Source interface {
 	SeekTo(positionMs int64) error
 	Duration() int64
 	CanSeek() bool
+	URL() string
 }
 
 type SourceFactory interface {
