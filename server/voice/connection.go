@@ -24,9 +24,13 @@ type Connection struct {
 
 	voiceConn voice.Conn
 
-	source audio.Source
-	paused atomic.Bool
-	mu     sync.Mutex
+	source       audio.Source
+	onTrackEnd   func(source audio.Source, reason string, err error)
+	onDisconnect func()
+	paused       atomic.Bool
+	closed       atomic.Bool
+	mutex        sync.Mutex
+	setupMu      sync.Mutex
 
 	stopChan chan struct{}
 }
@@ -37,70 +41,132 @@ func NewConnection(
 	userID, guildID, channelID snowflake.ID,
 	sessionID string,
 	voiceServerEvent protocol.VoiceServerEvent,
+	onTrackEnd func(source audio.Source, reason string, err error),
+	onDisconnect func(),
 ) (*Connection, error) {
 	conn := &Connection{
-		logger:    logger,
-		guildID:   guildID,
-		channelID: channelID,
-		userID:    userID,
-		stopChan:  make(chan struct{}),
+		logger:       logger,
+		guildID:      guildID,
+		channelID:    channelID,
+		userID:       userID,
+		onTrackEnd:   onTrackEnd,
+		onDisconnect: onDisconnect,
+		stopChan:     make(chan struct{}),
 	}
 
-	// Create disgo voice connection for standalone mode.
-	voiceConn := voice.NewConn(
-		guildID,
-		userID,
-		func(ctx context.Context, guildID snowflake.ID, channelID *snowflake.ID, selfMute, selfDeaf bool) error {
-			return nil
-		},
-		func() {
-			logger.Debug("voice connection removed from manager")
-		},
-		voice.WithConnLogger(logger),
-	)
-
-	// Provide voice events concurrently to avoid deadlocks/race conditions with Open
-	endpoint := voiceServerEvent.Endpoint
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-
-		voiceConn.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
-			VoiceState: discord.VoiceState{
-				GuildID:   guildID,
-				ChannelID: &channelID,
-				UserID:    userID,
-				SessionID: sessionID,
-			},
-		})
-
-		voiceConn.HandleVoiceServerUpdate(gateway.EventVoiceServerUpdate{
-			Token:    voiceServerEvent.Token,
-			GuildID:  guildID,
-			Endpoint: &endpoint,
-		})
-	}()
-
-	if err := voiceConn.Open(ctx, channelID, false, false); err != nil {
-		return nil, fmt.Errorf("failed to open voice connection: %w", err)
+	if err := conn.setupVoiceConn(ctx, channelID, sessionID, voiceServerEvent); err != nil {
+		return nil, err
 	}
-
-	conn.voiceConn = voiceConn
-
-	logger.Info("voice connection established",
-		slog.String("guild_id", guildID.String()),
-		slog.String("channel_id", channelID.String()),
-		slog.String("endpoint", endpoint),
-	)
 
 	return conn, nil
 }
 
+func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID, sessionID string, event protocol.VoiceServerEvent) error {
+	c.setupMu.Lock()
+	defer c.setupMu.Unlock()
+
+	if c.closed.Load() {
+		return fmt.Errorf("connection closed")
+	}
+
+	var currentVoiceConn voice.Conn
+	currentVoiceConn = voice.NewConn(
+		c.guildID,
+		c.userID,
+		func(ctx context.Context, guildID snowflake.ID, channelID *snowflake.ID, selfMute, selfDeaf bool) error {
+			return nil
+		},
+		func() {
+			c.logger.Debug("voice connection removed from manager")
+
+			if !c.closed.Load() || c.onDisconnect == nil {
+				return
+			}
+
+			// Only trigger onDisconnect if this is the CURRENT voiceConn
+			c.mutex.Lock()
+			isCurrent := (c.voiceConn == currentVoiceConn)
+			c.mutex.Unlock()
+
+			if !isCurrent {
+				return
+			}
+
+			c.onDisconnect()
+		},
+		voice.WithConnLogger(c.logger),
+	)
+
+	// Provide voice events concurrently to avoid deadlocks/race conditions with Open
+	endpoint := event.Endpoint
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+
+		currentVoiceConn.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
+			VoiceState: discord.VoiceState{
+				GuildID:   c.guildID,
+				ChannelID: &channelID,
+				UserID:    c.userID,
+				SessionID: sessionID,
+			},
+		})
+
+		currentVoiceConn.HandleVoiceServerUpdate(gateway.EventVoiceServerUpdate{
+			Token:    event.Token,
+			GuildID:  c.guildID,
+			Endpoint: &endpoint,
+		})
+	}()
+
+	if err := currentVoiceConn.Open(ctx, channelID, false, false); err != nil {
+		return fmt.Errorf("failed to open voice connection: %w", err)
+	}
+
+	c.mutex.Lock()
+	oldConn := c.voiceConn
+	c.voiceConn = currentVoiceConn
+	c.channelID = channelID
+	source := c.source
+	c.mutex.Unlock()
+
+	if oldConn != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			oldConn.Close(ctx)
+		}()
+	}
+
+	if source != nil {
+		currentVoiceConn.SetOpusFrameProvider(&trackWrapper{
+			source: source,
+			conn:   c,
+		})
+	}
+
+	return nil
+}
+
+func (c *Connection) HandleVoiceUpdate(ctx context.Context, channelID snowflake.ID, sessionID string, event protocol.VoiceServerEvent) error {
+	c.logger.Info("handling voice update (channel move/server change)",
+		slog.String("guild_id", c.guildID.String()),
+		slog.String("new_channel_id", channelID.String()),
+	)
+	return c.setupVoiceConn(ctx, channelID, sessionID, event)
+}
+
 func (c *Connection) Play(ctx context.Context, source audio.Source) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	if c.source != nil {
-		c.source.Close()
+		oldSource := c.source
+		c.source = nil
+		oldSource.Close()
+
+		if c.onTrackEnd != nil {
+			go c.onTrackEnd(oldSource, protocol.TrackEndReasonReplaced, nil)
+		}
 	}
 
 	c.source = source
@@ -112,7 +178,10 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 	default:
 	}
 
-	c.voiceConn.SetOpusFrameProvider(source)
+	c.voiceConn.SetOpusFrameProvider(&trackWrapper{
+		source: source,
+		conn:   c,
+	})
 
 	c.logger.Debug("started playback",
 		slog.String("guild_id", c.guildID.String()),
@@ -128,18 +197,21 @@ func (c *Connection) Pause() {
 
 func (c *Connection) Resume() {
 	c.paused.Store(false)
-	c.mu.Lock()
+	c.mutex.Lock()
 	source := c.source
-	c.mu.Unlock()
+	c.mutex.Unlock()
 
 	if source != nil {
-		c.voiceConn.SetOpusFrameProvider(source)
+		c.voiceConn.SetOpusFrameProvider(&trackWrapper{
+			source: source,
+			conn:   c,
+		})
 	}
 }
 
 func (c *Connection) Stop() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	select {
 	case <-c.stopChan:
@@ -148,17 +220,61 @@ func (c *Connection) Stop() {
 	}
 
 	if c.source != nil {
-		c.source.Close()
+		oldSource := c.source
 		c.source = nil
+		oldSource.Close()
+		if c.onTrackEnd != nil {
+			go c.onTrackEnd(oldSource, protocol.TrackEndReasonStopped, nil)
+		}
 	}
 
 	c.voiceConn.SetOpusFrameProvider(nil)
 }
 
+func (c *Connection) handleTrackEnd(source audio.Source, err error) {
+	c.mutex.Lock()
+	if c.source != source {
+		c.mutex.Unlock()
+		return
+	}
+	c.source = nil
+	c.mutex.Unlock()
+
+	reason := protocol.TrackEndReasonFinished
+	if err != nil && err != audio.ErrEOF {
+		reason = protocol.TrackEndReasonError
+	}
+
+	if c.onTrackEnd != nil {
+		c.onTrackEnd(source, reason, err)
+	}
+}
+
+type trackWrapper struct {
+	source audio.Source
+	conn   *Connection
+}
+
+func (w *trackWrapper) ProvideOpusFrame() ([]byte, error) {
+	return w.conn.provideOpusFrame(w.source)
+}
+
+func (w *trackWrapper) Close() {
+	w.source.Close()
+}
+
+func (c *Connection) provideOpusFrame(source audio.Source) ([]byte, error) {
+	frame, err := source.ProvideOpusFrame()
+	if err != nil {
+		c.handleTrackEnd(source, err)
+	}
+	return frame, err
+}
+
 func (c *Connection) SeekTo(positionMs int64) error {
-	c.mu.Lock()
+	c.mutex.Lock()
 	source := c.source
-	c.mu.Unlock()
+	c.mutex.Unlock()
 
 	if source == nil {
 		return fmt.Errorf("no active playback")
@@ -168,9 +284,9 @@ func (c *Connection) SeekTo(positionMs int64) error {
 }
 
 func (c *Connection) Position() int64 {
-	c.mu.Lock()
+	c.mutex.Lock()
 	source := c.source
-	c.mu.Unlock()
+	c.mutex.Unlock()
 
 	if source == nil {
 		return 0
@@ -180,6 +296,9 @@ func (c *Connection) Position() int64 {
 }
 
 func (c *Connection) Close() {
+	if c.closed.Swap(true) {
+		return
+	}
 	c.Stop()
 
 	// Close the disgo voice connection with timeout

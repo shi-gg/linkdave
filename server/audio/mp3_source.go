@@ -57,15 +57,19 @@ func NewMP3Source(ctx context.Context, url string, startTimeMs int64) (*MP3Sourc
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
 
-	decoder, err := mp3.NewDecoder(resp.Body)
+	return NewMP3SourceFromReader(resp.Body, url, startTimeMs)
+}
+
+func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64) (*MP3Source, error) {
+	decoder, err := mp3.NewDecoder(reader)
 	if err != nil {
-		resp.Body.Close()
+		reader.Close()
 		return nil, fmt.Errorf("create mp3 decoder: %w", err)
 	}
 
 	encoder, err := opus.NewEncoder(opusSampleRate, opusChannels, opus.AppAudio)
 	if err != nil {
-		resp.Body.Close()
+		reader.Close()
 		return nil, fmt.Errorf("create opus encoder: %w", err)
 	}
 
@@ -77,9 +81,9 @@ func NewMP3Source(ctx context.Context, url string, startTimeMs int64) (*MP3Sourc
 	inputFrameBytes := int(float64(pcmFrameBytes) / resampleRatio)
 	inputFrameBytes = ((inputFrameBytes + 3) / 4) * 4
 
-	return &MP3Source{
+	s := &MP3Source{
 		url:           url,
-		body:          resp.Body,
+		body:          reader,
 		decoder:       decoder,
 		encoder:       encoder,
 		pcmBuffer:     make([]byte, inputFrameBytes),
@@ -87,7 +91,10 @@ func NewMP3Source(ctx context.Context, url string, startTimeMs int64) (*MP3Sourc
 		opusBuffer:    make([]byte, 4000),
 		srcSampleRate: srcSampleRate,
 		resampleRatio: resampleRatio,
-	}, nil
+	}
+	s.position.Store(startTimeMs)
+
+	return s, nil
 }
 
 func (s *MP3Source) ProvideOpusFrame() ([]byte, error) {
@@ -188,9 +195,19 @@ func (s *MP3Source) SeekTo(positionMs int64) error {
 }
 
 func (s *MP3Source) Duration() int64 {
-	return 0
+	length := s.decoder.Length()
+	if length <= 0 {
+		return 0
+	}
+	// length is in bytes. 2 channels, 2 bytes per sample = 4 bytes per stereo sample.
+	samples := length / 4
+	return int64(float64(samples) / float64(s.srcSampleRate) * 1000)
 }
 
 func (s *MP3Source) CanSeek() bool {
 	return false
+}
+
+func (s *MP3Source) URL() string {
+	return s.url
 }

@@ -1,6 +1,8 @@
 package protocol
 
-import "github.com/disgoorg/snowflake/v2"
+import (
+	"github.com/disgoorg/snowflake/v2"
+)
 
 // Message is the base WebSocket message structure
 type Message struct {
@@ -81,12 +83,12 @@ type TrackErrorData struct {
 	Error   string       `json:"error"`
 }
 
-type VoiceConnectedData struct {
+type VoiceConnectData struct {
 	GuildID   snowflake.ID `json:"guild_id"`
 	ChannelID snowflake.ID `json:"channel_id"`
 }
 
-type VoiceDisconnectedData struct {
+type VoiceDisconnectData struct {
 	GuildID snowflake.ID `json:"guild_id"`
 	Reason  string       `json:"reason,omitempty"`
 }
