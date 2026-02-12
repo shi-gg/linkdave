@@ -25,21 +25,23 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	logger       *slog.Logger
-	voiceManager *voice.Manager
-	clients      map[string]*Client
-	clientsMu    sync.RWMutex
-	startTime    time.Time
-	draining     bool
-	drainMu      sync.RWMutex
+	logger            *slog.Logger
+	voiceManager      *voice.Manager
+	clients           map[string]*Client
+	clientsByClientId map[snowflake.ID][]*Client
+	clientsMu         sync.RWMutex
+	startTime         time.Time
+	draining          bool
+	drainMu           sync.RWMutex
 }
 
 func NewServer(logger *slog.Logger, voiceManager *voice.Manager) *Server {
 	s := &Server{
-		logger:       logger,
-		voiceManager: voiceManager,
-		clients:      make(map[string]*Client),
-		startTime:    time.Now(),
+		logger:            logger,
+		voiceManager:      voiceManager,
+		clients:           make(map[string]*Client),
+		clientsByClientId: make(map[snowflake.ID][]*Client),
+		startTime:         time.Now(),
 	}
 	voiceManager.SetEventHandler(s)
 	s.startTickers()
@@ -70,13 +72,10 @@ func (s *Server) sendStats() {
 
 func (s *Server) OnTrackEnd(clientId, guildID snowflake.ID, source audio.Source, reason string) {
 	s.clientsMu.RLock()
-	defer s.clientsMu.RUnlock()
+	clients := s.clientsByClientId[clientId]
+	s.clientsMu.RUnlock()
 
-	for _, client := range s.clients {
-		if client.clientId != clientId {
-			continue
-		}
-
+	for _, client := range clients {
 		player := client.getPlayer(guildID)
 		if player == nil {
 			continue
@@ -102,13 +101,10 @@ func (s *Server) OnTrackEnd(clientId, guildID snowflake.ID, source audio.Source,
 
 func (s *Server) OnTrackException(clientId, guildID snowflake.ID, source audio.Source, err error) {
 	s.clientsMu.RLock()
-	defer s.clientsMu.RUnlock()
+	clients := s.clientsByClientId[clientId]
+	s.clientsMu.RUnlock()
 
-	for _, client := range s.clients {
-		if client.clientId != clientId {
-			continue
-		}
-
+	for _, client := range clients {
 		client.send(protocol.Message{
 			Op: protocol.OpTrackError,
 			Data: protocol.TrackErrorData{
@@ -125,13 +121,10 @@ func (s *Server) OnTrackException(clientId, guildID snowflake.ID, source audio.S
 
 func (s *Server) OnVoiceDisconnected(clientId, guildID snowflake.ID) {
 	s.clientsMu.RLock()
-	defer s.clientsMu.RUnlock()
+	clients := s.clientsByClientId[clientId]
+	s.clientsMu.RUnlock()
 
-	for _, client := range s.clients {
-		if client.clientId != clientId {
-			continue
-		}
-
+	for _, client := range clients {
 		client.removePlayer(guildID)
 
 		client.send(protocol.Message{
@@ -167,12 +160,23 @@ func (s *Server) registerClient(client *Client) {
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 	s.clients[client.sessionID] = client
+	s.clientsByClientId[client.clientId] = append(s.clientsByClientId[client.clientId], client)
 }
 
 func (s *Server) unregisterClient(client *Client) {
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 	delete(s.clients, client.sessionID)
+	clients := s.clientsByClientId[client.clientId]
+	for i, c := range clients {
+		if c == client {
+			s.clientsByClientId[client.clientId] = append(clients[:i], clients[i+1:]...)
+			break
+		}
+	}
+	if len(s.clientsByClientId[client.clientId]) == 0 {
+		delete(s.clientsByClientId, client.clientId)
+	}
 }
 
 func (s *Server) handleMessage(client *Client, msgType int, data []byte) {

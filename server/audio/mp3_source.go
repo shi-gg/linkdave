@@ -29,16 +29,17 @@ type MP3Source struct {
 	decoder *mp3.Decoder
 	encoder *opus.Encoder
 
-	pcmBuffer  []byte
-	pcmSamples []int16
-	opusBuffer []byte
+	pcmBuffer    []byte
+	pcmSamples   []int16
+	inputSamples []int16
+	opusBuffer   []byte
 
 	srcSampleRate int
 	resampleRatio float64
 
 	position atomic.Int64
 	closed   atomic.Bool
-	mu       sync.Mutex
+	mutex    sync.Mutex
 }
 
 func NewMP3Source(ctx context.Context, url string, startTimeMs int64) (*MP3Source, error) {
@@ -87,6 +88,7 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 		decoder:       decoder,
 		encoder:       encoder,
 		pcmBuffer:     make([]byte, inputFrameBytes),
+		inputSamples:  make([]int16, inputFrameBytes/2),
 		pcmSamples:    make([]int16, opusFrameSize*opusChannels),
 		opusBuffer:    make([]byte, 4000),
 		srcSampleRate: srcSampleRate,
@@ -98,8 +100,8 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 }
 
 func (s *MP3Source) ProvideOpusFrame() ([]byte, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	if s.closed.Load() {
 		return nil, io.EOF
@@ -120,16 +122,15 @@ func (s *MP3Source) ProvideOpusFrame() ([]byte, error) {
 	}
 
 	numInputSamples := len(s.pcmBuffer) / 2
-	inputSamples := make([]int16, numInputSamples)
 	for i := 0; i < numInputSamples; i++ {
-		inputSamples[i] = int16(binary.LittleEndian.Uint16(s.pcmBuffer[i*2:]))
+		s.inputSamples[i] = int16(binary.LittleEndian.Uint16(s.pcmBuffer[i*2:]))
 	}
 
 	// Resample if needed (linear interpolation for simplicity)
 	if s.resampleRatio != 1.0 {
-		s.resampleLinear(inputSamples, s.pcmSamples)
+		s.resampleLinear(s.inputSamples, s.pcmSamples)
 	} else {
-		copy(s.pcmSamples, inputSamples)
+		copy(s.pcmSamples, s.inputSamples)
 	}
 
 	numBytes, err := s.encoder.Encode(s.pcmSamples, s.opusBuffer)
@@ -181,8 +182,8 @@ func (s *MP3Source) Close() {
 	if s.closed.Swap(true) {
 		return
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	s.body.Close()
 }
 
