@@ -63,7 +63,7 @@ func (m *Manager) onDisconnect(clientId, guildID snowflake.ID, conn *Connection,
 		delete(m.connections, key)
 	}
 	handler := m.eventHandler
-	m.mutex.RUnlock()
+	m.mutex.Unlock()
 
 	if handler != nil {
 		handler.OnVoiceDisconnected(clientId, guildID)
