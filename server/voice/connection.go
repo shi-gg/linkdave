@@ -98,14 +98,15 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	)
 
 	// Provide voice events concurrently to avoid deadlocks/race conditions with Open
-	endpoint := event.Endpoint
+	channelIDCopy := channelID
+	endpointCopy := event.Endpoint
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 
 		currentVoiceConn.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
 			VoiceState: discord.VoiceState{
 				GuildID:   c.guildID,
-				ChannelID: &channelID,
+				ChannelID: &channelIDCopy,
 				UserID:    c.userID,
 				SessionID: sessionID,
 			},
@@ -114,7 +115,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		currentVoiceConn.HandleVoiceServerUpdate(gateway.EventVoiceServerUpdate{
 			Token:    event.Token,
 			GuildID:  c.guildID,
-			Endpoint: &endpoint,
+			Endpoint: &endpointCopy,
 		})
 	}()
 
