@@ -1,4 +1,4 @@
-FROM golang:1.26rc2 AS builder
+FROM golang:1.26 AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -10,19 +10,30 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
+ENV LIBDAVE_VERSION=1.1.1
+
 RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then GITHUB_ARCH="X64"; \
-    elif [ "$ARCH" = "aarch64" ]; then GITHUB_ARCH="ARM64"; \
-    else GITHUB_ARCH="$ARCH"; fi && \
-    curl -fsL "https://github.com/discord/libdave/releases/download/v1.1.1/cpp/libdave-Linux-$GITHUB_ARCH-boringssl.zip" -o /tmp/libdave.zip && \
-    mkdir -p ~/.local/lib ~/.local/include ~/.local/lib/pkgconfig && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        GITHUB_ARCH="X64"; \
+        LIBDAVE_SHA256="2470a131dbf39a820d893ba3d6f01373fc597868caffd6a30a8746e441ed5ede"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        GITHUB_ARCH="ARM64"; \
+        LIBDAVE_SHA256="2848ca62da5c8303626cfa410827f37735455f614256311fc320b35c7c6a1975"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi && \
+    curl -fsL "https://github.com/discord/libdave/releases/download/v${LIBDAVE_VERSION}/cpp/libdave-Linux-${GITHUB_ARCH}-boringssl.zip" -o /tmp/libdave.zip && \
+    echo "${LIBDAVE_SHA256}  /tmp/libdave.zip" | sha256sum -c -
+
+RUN mkdir -p ~/.local/lib ~/.local/include ~/.local/lib/pkgconfig && \
     unzip -j -o /tmp/libdave.zip "include/dave/dave.h" -d ~/.local/include && \
     unzip -j -o /tmp/libdave.zip "lib/libdave.so" -d ~/.local/lib && \
-    rm /tmp/libdave.zip && \
-    echo "prefix=$HOME/.local\nexec_prefix=\${prefix}\nlibdir=\${exec_prefix}/lib\nincludedir=\${prefix}/include\n\nName: dave\nDescription: Discord Audio & Video End-to-End Encryption (DAVE) Protocol\nVersion: 1.1.1\nURL: https://github.com/discord/libdave\nLibs: -L\${libdir} -ldave -Wl,-rpath,\${libdir}\nCflags: -I\${includedir}" > ~/.local/lib/pkgconfig/dave.pc
+    rm /tmp/libdave.zip
 
-ENV PKG_CONFIG_PATH="/root/.local/lib/pkgconfig:$PKG_CONFIG_PATH"
-ENV LD_LIBRARY_PATH="/root/.local/lib:$LD_LIBRARY_PATH"
+RUN echo "prefix=$HOME/.local\nexec_prefix=\${prefix}\nlibdir=\${exec_prefix}/lib\nincludedir=\${prefix}/include\n\nName: dave\nDescription: Discord Audio & Video End-to-End Encryption (DAVE) Protocol\nVersion: ${LIBDAVE_VERSION}\nURL: https://github.com/discord/libdave\nLibs: -L\${libdir} -ldave -Wl,-rpath,\${libdir}\nCflags: -I\${includedir}" > ~/.local/lib/pkgconfig/dave.pc
+
+ENV PKG_CONFIG_PATH="/root/.local/lib/pkgconfig"
+ENV LD_LIBRARY_PATH="/root/.local/lib"
 
 WORKDIR /app
 
