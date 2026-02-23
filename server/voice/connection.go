@@ -30,6 +30,7 @@ type Connection struct {
 	onDisconnect func()
 	paused       atomic.Bool
 	closed       atomic.Bool
+	disconnected atomic.Bool
 	mutex        sync.Mutex
 	setupMu      sync.Mutex
 
@@ -81,6 +82,10 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			c.logger.Debug("voice connection removed from manager")
 
 			if !c.closed.Load() || c.onDisconnect == nil {
+				return
+			}
+
+			if c.disconnected.Load() || c.onDisconnect == nil {
 				return
 			}
 
@@ -302,6 +307,7 @@ func (c *Connection) Close() {
 	if c.closed.Swap(true) {
 		return
 	}
+	c.disconnected.Store(true)
 	c.Stop()
 
 	// Close the disgo voice connection with timeout
