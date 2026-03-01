@@ -44,25 +44,31 @@ discord.on(Events.MessageCreate, async (msg) => {
 
     if (cmd === "!join") {
         const vc = (await msg.member?.fetch())?.voice.channel;
-        if (!vc) return msg.reply("Join a voice channel first!");
+        if (!vc) {
+            msg.reply("Join a voice channel first!");
+            return;
+        }
 
         const player = linkdave.getPlayer(msg.guild.id);
         player.connect(vc.id);
-        await msg.reply(`Joining ${vc.name}...`);
+
+        void msg.reply(`Joining ${vc.name}...`);
     }
 
-    if (cmd === "!play" && args[0]) {
-        const player = linkdave.players.get(msg.guild.id);
-        if (!player) return msg.reply("Use !join first");
-        player.play(args[0]);
-        await msg.reply(`Playing: ${args[0]}`);
+    const player = linkdave.players.get(msg.guild.id);
+    if (!player) {
+        msg.reply("Use !join first");
+        return;
     }
 
-    if (cmd === "!pause") linkdave.players.get(msg.guild.id)?.pause();
-    if (cmd === "!resume") linkdave.players.get(msg.guild.id)?.resume();
-    if (cmd === "!stop") linkdave.players.get(msg.guild.id)?.stop();
-    if (cmd === "!leave") linkdave.players.get(msg.guild.id)?.destroy();
-    if (cmd === "!volume" && args[0]) linkdave.players.get(msg.guild.id)?.setVolume(parseInt(args[0], 10) * 10);
+    switch (cmd) {
+        case "!play": player.play(args[0]);
+        case "!pause": player.pause();
+        case "!resume": player.resume();
+        case "!stop": player.stop()
+        case "!leave": player.destroy();
+        case "!volume": player.setVolume(parseInt(args[0], 10) * 10);
+    }
 });
 
 process.on("SIGINT", () => {
