@@ -147,7 +147,7 @@ export class LinkDaveClient extends EventEmitter {
     }
 
     get players(): ReadonlyMap<string, Player> {
-        return new Map(this.#players);
+        return this.#players;
     }
 
     get clientId() {
