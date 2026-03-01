@@ -68,18 +68,15 @@ export class LinkDaveClient extends EventEmitter {
         const node = this.#nodes.get(name);
         if (!node) return false;
 
-        node.disconnect();
         this.#nodes.delete(name);
+        node.disconnect();
+
         this.emit(ManagerEventName.NodeRemove, { node });
 
         return true;
     }
 
-    getNode(name: string) {
-        return this.#nodes.get(name);
-    }
-
-    get nodes() {
+    get nodes(): ReadonlyMap<string, Node> {
         return this.#nodes;
     }
 
@@ -134,10 +131,6 @@ export class LinkDaveClient extends EventEmitter {
         return player;
     }
 
-    getExistingPlayer(guildId: string) {
-        return this.#players.get(guildId);
-    }
-
     removePlayer(guildId: string) {
         const player = this.#players.get(guildId);
         if (!player) {
@@ -153,8 +146,8 @@ export class LinkDaveClient extends EventEmitter {
         return this.#players.get(guildId)?.node;
     }
 
-    get players() {
-        return new Map(this.#players);
+    get players(): ReadonlyMap<string, Player> {
+        return this.#players;
     }
 
     get clientId() {
@@ -218,6 +211,8 @@ export class LinkDaveClient extends EventEmitter {
     ) {
         const player = this.#players.get(guildId);
         if (player?.node !== node) return;
+
+        // handle voice connect and disconnect to delete player automatically, later
 
         this.emit(event, data as ManagerEvents[K]);
     }
