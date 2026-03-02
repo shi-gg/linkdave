@@ -136,25 +136,13 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 				return
 			}
 			c.connectedUsers.Add(int32(len(d.UserIDs)))
-			c.mutex.Lock()
-			conn := c.voiceConn
-			isReady := c.targetVoiceConn == nil && conn != nil && conn.UDP() != nil
-			if isReady && conn == currentVoiceConn && c.source != nil {
-				c.safeSetOpusFrameProvider(conn, &trackWrapper{source: c.source, conn: c})
-			}
-			c.mutex.Unlock()
+			c.maybeSetOpusProvider(currentVoiceConn, &trackWrapper{source: c.source, conn: c})
 		case voice.OpcodeClientDisconnect:
 			c.connectedUsers.Add(-1)
 			if c.connectedUsers.Load() > 0 {
 				return
 			}
-			c.mutex.Lock()
-			conn := c.voiceConn
-			isReady := c.targetVoiceConn == nil && conn != nil && conn.UDP() != nil
-			if isReady && conn == currentVoiceConn && c.source != nil {
-				c.safeSetOpusFrameProvider(conn, nil)
-			}
-			c.mutex.Unlock()
+			c.maybeSetOpusProvider(currentVoiceConn, nil)
 		}
 	})
 
@@ -350,6 +338,16 @@ func (c *Connection) safeSetOpusFrameProvider(vc voice.Conn, provider voice.Opus
 		}
 	}()
 	vc.SetOpusFrameProvider(provider)
+}
+
+func (c *Connection) maybeSetOpusProvider(vc voice.Conn, provider voice.OpusFrameProvider) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	conn := c.voiceConn
+	if c.targetVoiceConn == nil && conn != nil && conn.UDP() != nil && conn == vc && c.source != nil {
+		c.safeSetOpusFrameProvider(conn, provider)
+	}
 }
 
 func (c *Connection) provideOpusFrame(source audio.Source) ([]byte, error) {
