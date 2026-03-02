@@ -80,7 +80,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		func() {
 			c.logger.Debug("voice connection removed from manager")
 
-			if !c.closed.Load() || c.onDisconnect == nil {
+			if c.closed.Load() || c.onDisconnect == nil {
 				return
 			}
 
@@ -97,6 +97,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		},
 		voice.WithConnLogger(c.logger),
 		voice.WithConnDaveSessionCreateFunc(golibdave.NewSession),
+		voice.WithConnGatewayConfigOpts(voice.WithGatewayAutoReconnect(false)),
 	)
 
 	// Provide voice events concurrently to avoid deadlocks/race conditions with Open
@@ -141,7 +142,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	}
 
 	if source != nil {
-		currentVoiceConn.SetOpusFrameProvider(&trackWrapper{
+		c.safeSetOpusFrameProvider(currentVoiceConn, &trackWrapper{
 			source: source,
 			conn:   c,
 		})
@@ -181,7 +182,8 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 	default:
 	}
 
-	c.voiceConn.SetOpusFrameProvider(&trackWrapper{
+	vc := c.voiceConn
+	c.safeSetOpusFrameProvider(vc, &trackWrapper{
 		source: source,
 		conn:   c,
 	})
@@ -195,17 +197,21 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 
 func (c *Connection) Pause() {
 	c.paused.Store(true)
-	c.voiceConn.SetOpusFrameProvider(nil)
+	c.mutex.Lock()
+	vc := c.voiceConn
+	c.mutex.Unlock()
+	c.safeSetOpusFrameProvider(vc, nil)
 }
 
 func (c *Connection) Resume() {
 	c.paused.Store(false)
 	c.mutex.Lock()
 	source := c.source
+	vc := c.voiceConn
 	c.mutex.Unlock()
 
 	if source != nil {
-		c.voiceConn.SetOpusFrameProvider(&trackWrapper{
+		c.safeSetOpusFrameProvider(vc, &trackWrapper{
 			source: source,
 			conn:   c,
 		})
@@ -231,7 +237,8 @@ func (c *Connection) Stop() {
 		}
 	}
 
-	c.voiceConn.SetOpusFrameProvider(nil)
+	vc := c.voiceConn
+	c.safeSetOpusFrameProvider(vc, nil)
 }
 
 func (c *Connection) handleTrackEnd(source audio.Source, err error) {
@@ -264,6 +271,22 @@ func (w *trackWrapper) ProvideOpusFrame() ([]byte, error) {
 
 func (w *trackWrapper) Close() {
 	w.source.Close()
+}
+
+// safeSetOpusFrameProvider wraps SetOpusFrameProvider with a recover to guard
+// against a race condition in disgo where the audio sender's cancelFunc can be
+// nil if Close() is called before the open() goroutine sets it.
+// The caller must capture voiceConn under c.mutex and pass it as vc.
+func (c *Connection) safeSetOpusFrameProvider(vc voice.Conn, provider voice.OpusFrameProvider) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.logger.Warn("recovered from panic in SetOpusFrameProvider",
+				slog.Any("panic", r),
+				slog.String("guild_id", c.guildID.String()),
+			)
+		}
+	}()
+	vc.SetOpusFrameProvider(provider)
 }
 
 func (c *Connection) provideOpusFrame(source audio.Source) ([]byte, error) {
@@ -304,10 +327,14 @@ func (c *Connection) Close() {
 	}
 	c.Stop()
 
+	c.mutex.Lock()
+	vc := c.voiceConn
+	c.mutex.Unlock()
+
 	// Close the disgo voice connection with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	c.voiceConn.Close(ctx)
+	vc.Close(ctx)
 
 	c.logger.Debug("voice connection closed",
 		slog.String("guild_id", c.guildID.String()),
