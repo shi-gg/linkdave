@@ -70,16 +70,6 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	if c.setupCancel != nil {
 		c.setupCancel()
 	}
-	c.mutex.Unlock()
-
-	c.setupMu.Lock()
-	defer c.setupMu.Unlock()
-
-	if c.closed.Load() {
-		return fmt.Errorf("connection closed")
-	}
-
-	c.mutex.Lock()
 	oldConn := c.voiceConn
 	c.voiceConn = nil
 	c.mutex.Unlock()
@@ -90,6 +80,13 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			defer cancel()
 			oldConn.Close(ctx)
 		}()
+	}
+
+	c.setupMu.Lock()
+	defer c.setupMu.Unlock()
+
+	if c.closed.Load() {
+		return fmt.Errorf("connection closed")
 	}
 
 	var currentVoiceConn voice.Conn
@@ -388,6 +385,10 @@ func (c *Connection) Close() {
 	c.mutex.Lock()
 	vc := c.voiceConn
 	c.mutex.Unlock()
+
+	if vc == nil {
+		return
+	}
 
 	// Close the disgo voice connection with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
