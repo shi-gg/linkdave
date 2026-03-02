@@ -182,7 +182,8 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 	default:
 	}
 
-	c.voiceConn.SetOpusFrameProvider(&trackWrapper{
+	vc := c.voiceConn
+	vc.SetOpusFrameProvider(&trackWrapper{
 		source: source,
 		conn:   c,
 	})
@@ -196,17 +197,21 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 
 func (c *Connection) Pause() {
 	c.paused.Store(true)
-	c.safeSetOpusFrameProvider(nil)
+	c.mutex.Lock()
+	vc := c.voiceConn
+	c.mutex.Unlock()
+	c.safeSetOpusFrameProvider(vc, nil)
 }
 
 func (c *Connection) Resume() {
 	c.paused.Store(false)
 	c.mutex.Lock()
 	source := c.source
+	vc := c.voiceConn
 	c.mutex.Unlock()
 
 	if source != nil {
-		c.voiceConn.SetOpusFrameProvider(&trackWrapper{
+		vc.SetOpusFrameProvider(&trackWrapper{
 			source: source,
 			conn:   c,
 		})
@@ -232,7 +237,8 @@ func (c *Connection) Stop() {
 		}
 	}
 
-	c.safeSetOpusFrameProvider(nil)
+	vc := c.voiceConn
+	c.safeSetOpusFrameProvider(vc, nil)
 }
 
 func (c *Connection) handleTrackEnd(source audio.Source, err error) {
@@ -270,7 +276,8 @@ func (w *trackWrapper) Close() {
 // safeSetOpusFrameProvider wraps SetOpusFrameProvider with a recover to guard
 // against a race condition in disgo where the audio sender's cancelFunc can be
 // nil if Close() is called before the open() goroutine sets it.
-func (c *Connection) safeSetOpusFrameProvider(provider voice.OpusFrameProvider) {
+// The caller must capture voiceConn under c.mutex and pass it as vc.
+func (c *Connection) safeSetOpusFrameProvider(vc voice.Conn, provider voice.OpusFrameProvider) {
 	defer func() {
 		if r := recover(); r != nil {
 			c.logger.Warn("recovered from panic in SetOpusFrameProvider",
@@ -279,7 +286,7 @@ func (c *Connection) safeSetOpusFrameProvider(provider voice.OpusFrameProvider) 
 			)
 		}
 	}()
-	c.voiceConn.SetOpusFrameProvider(provider)
+	vc.SetOpusFrameProvider(provider)
 }
 
 func (c *Connection) provideOpusFrame(source audio.Source) ([]byte, error) {
@@ -320,10 +327,14 @@ func (c *Connection) Close() {
 	}
 	c.Stop()
 
+	c.mutex.Lock()
+	vc := c.voiceConn
+	c.mutex.Unlock()
+
 	// Close the disgo voice connection with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	c.voiceConn.Close(ctx)
+	vc.Close(ctx)
 
 	c.logger.Debug("voice connection closed",
 		slog.String("guild_id", c.guildID.String()),
