@@ -142,7 +142,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	}
 
 	if source != nil {
-		currentVoiceConn.SetOpusFrameProvider(&trackWrapper{
+		c.safeSetOpusFrameProvider(currentVoiceConn, &trackWrapper{
 			source: source,
 			conn:   c,
 		})
@@ -183,7 +183,7 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 	}
 
 	vc := c.voiceConn
-	vc.SetOpusFrameProvider(&trackWrapper{
+	c.safeSetOpusFrameProvider(vc, &trackWrapper{
 		source: source,
 		conn:   c,
 	})
@@ -211,7 +211,7 @@ func (c *Connection) Resume() {
 	c.mutex.Unlock()
 
 	if source != nil {
-		vc.SetOpusFrameProvider(&trackWrapper{
+		c.safeSetOpusFrameProvider(vc, &trackWrapper{
 			source: source,
 			conn:   c,
 		})
