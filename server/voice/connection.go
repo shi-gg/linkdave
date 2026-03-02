@@ -33,6 +33,8 @@ type Connection struct {
 	mutex        sync.Mutex
 	setupMu      sync.Mutex
 
+	setupCancel context.CancelFunc
+
 	stopChan chan struct{}
 }
 
@@ -63,12 +65,24 @@ func NewConnection(
 }
 
 func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID, sessionID string, event protocol.VoiceServerEvent) error {
+	c.mutex.Lock()
+	if c.setupCancel != nil {
+		c.setupCancel()
+	}
+	c.mutex.Unlock()
+
 	c.setupMu.Lock()
 	defer c.setupMu.Unlock()
 
 	if c.closed.Load() {
 		return fmt.Errorf("connection closed")
 	}
+
+	c.mutex.Lock()
+	if c.voiceConn != nil {
+		c.safeSetOpusFrameProvider(c.voiceConn, nil)
+	}
+	c.mutex.Unlock()
 
 	var currentVoiceConn voice.Conn
 	currentVoiceConn = voice.NewConn(
@@ -122,15 +136,33 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		})
 	}()
 
-	if err := currentVoiceConn.Open(ctx, channelID, false, false); err != nil {
+	openCtx, openCancel := context.WithCancel(ctx)
+	c.mutex.Lock()
+	c.setupCancel = openCancel
+	c.mutex.Unlock()
+
+	if err := currentVoiceConn.Open(openCtx, channelID, false, false); err != nil {
+		openCancel()
+		c.logger.Warn("voice connection open failed, cleaning up",
+			slog.String("guild_id", c.guildID.String()),
+			slog.String("channel_id", channelID.String()),
+			slog.Any("err", err),
+		)
+		go func() {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cleanupCancel()
+			currentVoiceConn.Close(cleanupCtx)
+		}()
 		return fmt.Errorf("failed to open voice connection: %w", err)
 	}
+	openCancel()
 
 	c.mutex.Lock()
 	oldConn := c.voiceConn
 	c.voiceConn = currentVoiceConn
 	c.channelID = channelID
 	source := c.source
+	c.setupCancel = nil
 	c.mutex.Unlock()
 
 	if oldConn != nil {
