@@ -36,7 +36,8 @@ type Connection struct {
 
 	setupCancel context.CancelFunc
 
-	stopChan chan struct{}
+	stopChan       chan struct{}
+	connectedUsers atomic.Int32
 }
 
 func NewConnection(
@@ -57,6 +58,7 @@ func NewConnection(
 		onDisconnect: onDisconnect,
 		stopChan:     make(chan struct{}),
 	}
+	conn.connectedUsers.Store(0)
 
 	if err := conn.setupVoiceConn(ctx, channelID, sessionID, voiceServerEvent); err != nil {
 		return nil, err
@@ -72,6 +74,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	}
 	oldConn := c.voiceConn
 	c.voiceConn = nil
+	c.connectedUsers.Store(0)
 	c.mutex.Unlock()
 
 	if oldConn != nil {
@@ -132,6 +135,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			if !ok || len(d.UserIDs) == 0 {
 				return
 			}
+			c.connectedUsers.Add(int32(len(d.UserIDs)))
 			c.mutex.Lock()
 			conn := c.voiceConn
 			isReady := c.targetVoiceConn == nil && conn != nil && conn.UDP() != nil
@@ -140,6 +144,10 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			}
 			c.mutex.Unlock()
 		case voice.OpcodeClientDisconnect:
+			c.connectedUsers.Add(-1)
+			if c.connectedUsers.Load() > 0 {
+				return
+			}
 			c.mutex.Lock()
 			conn := c.voiceConn
 			isReady := c.targetVoiceConn == nil && conn != nil && conn.UDP() != nil
