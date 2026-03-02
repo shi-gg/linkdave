@@ -56,18 +56,15 @@ discord.on(Events.MessageCreate, async (msg) => {
     }
 
     const player = linkdave.players.get(msg.guild.id);
-    if (!player) {
-        msg.reply("Use !join first");
-        return;
-    }
+    if (!player) return;
 
     switch (cmd) {
-        case "!play": player.play(args[0]);
-        case "!pause": player.pause();
-        case "!resume": player.resume();
-        case "!stop": player.stop()
-        case "!leave": player.destroy();
-        case "!volume": player.setVolume(parseInt(args[0], 10) * 10);
+        case "!play": player.play(args[0]); break;
+        case "!pause": player.pause(); break;
+        case "!resume": player.resume(); break;
+        case "!stop": player.stop(); break;
+        case "!leave": player.destroy(); break;
+        case "!volume": player.setVolume(parseInt(args[0], 10) * 10); break;
     }
 });
 
