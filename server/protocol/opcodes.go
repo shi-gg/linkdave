@@ -1,16 +1,8 @@
 package protocol
 
 const (
-	OpIdentify      uint8 = 0
 	OpVoiceUpdate   uint8 = 1
-	OpPlay          uint8 = 2
-	OpPause         uint8 = 3
-	OpResume        uint8 = 4
-	OpStop          uint8 = 5
-	OpSeek          uint8 = 6
-	OpDisconnect    uint8 = 7
 	OpPing          uint8 = 8
-	OpVolume        uint8 = 9
 	OpPlayerMigrate uint8 = 10
 )
 

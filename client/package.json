@@ -1,6 +1,6 @@
 {
     "name": "linkdave",
-    "version": "0.0.3",
+    "version": "0.1.0",
     "description": "TypeScript client library for linkdave Discord audio streaming server",
     "repository": {
         "type": "git",
@@ -26,10 +26,10 @@
         "node": ">=24.0.0"
     },
     "devDependencies": {
-        "@mwlica/eslint": "^1.1.3",
-        "@types/node": "^25.2.3",
+        "@mwlica/eslint": "^1.2.0",
+        "@types/node": "^25.3.3",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.55.0"
+        "typescript-eslint": "^8.56.1"
     },
     "keywords": [
         "discord",
@@ -40,6 +40,6 @@
     ],
     "license": "AGPL-3.0-only",
     "dependencies": {
-        "discord-api-types": "^0.38.38"
+        "discord-api-types": "^0.38.40"
     }
 }

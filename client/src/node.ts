@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 
+import { RESTClient } from "./rest.js";
 import type {
     ClientMessage, Events,
     PlayPayload,
@@ -11,6 +12,7 @@ import type {
 import {
     ClientOpCodes,
     EventName,
+    Routes,
     ServerOpCodes
 } from "./types.js";
 
@@ -43,11 +45,11 @@ export class Node extends EventEmitter {
 
     readonly name: string;
     readonly url: string;
+    readonly rest: RESTClient;
     readonly #options: Required<Omit<NodeOptions, "name" | "url">>;
 
     #ws: WebSocket | null = null;
     #sessionId: string | null = null;
-    #clientId: string | null = null;
     #reconnectAttempts = 0;
     #reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     #pingInterval: ReturnType<typeof setInterval> | null = null;
@@ -58,6 +60,7 @@ export class Node extends EventEmitter {
         super();
         this.name = options.name;
         this.url = options.url;
+        this.rest = new RESTClient(options.url);
         this.#options = {
             autoReconnect: options.autoReconnect ?? true,
             reconnectDelay: options.reconnectDelay ?? 5_000,
@@ -65,8 +68,7 @@ export class Node extends EventEmitter {
         };
     }
 
-    connect(clientId: string) {
-        this.#clientId = clientId;
+    connect() {
         this.#state = NodeState.Connecting;
 
         return new Promise((resolve, reject) => {
@@ -87,7 +89,6 @@ export class Node extends EventEmitter {
                 this.#state = NodeState.Connected;
                 this.#reconnectAttempts = 0;
                 this.#startPingInterval();
-                this.#sendIdentify();
                 resolve(null);
             };
 
@@ -158,6 +159,8 @@ export class Node extends EventEmitter {
     }
 
     #handleMessage(message: ServerMessage) {
+        // eslint-disable-next-line no-console
+        if (message.op !== ServerOpCodes.Stats) console.log(EventName[ServerOpCodes[message.op] as "Ready"], message);
         switch (message.op) {
             case ServerOpCodes.Ready:
                 this.#sessionId = message.d.session_id;
@@ -211,16 +214,15 @@ export class Node extends EventEmitter {
     }
 
     #scheduleReconnect() {
-        if (this.#reconnectTimeout || !this.#clientId) return;
+        if (this.#reconnectTimeout) return;
 
         const delay = this.#options.reconnectDelay * (2) ** (this.#reconnectAttempts);
         this.#reconnectAttempts++;
 
         this.#reconnectTimeout = setTimeout(() => {
             this.#reconnectTimeout = null;
-            if (!this.#clientId) return;
 
-            void this.connect(this.#clientId).catch(() => {
+            void this.connect().catch(() => {
                 // Ignore connection errors during reconnection
                 // onClose will handle scheduling the next attempt
             });
@@ -249,48 +251,47 @@ export class Node extends EventEmitter {
         this.#pingInterval = null;
     }
 
-    #sendIdentify() {
-        if (!this.#clientId) return;
-
-        this.#send(ClientOpCodes.Identify, {
-            bot_id: this.#clientId
-        });
-    }
-
     sendVoiceUpdate(data: VoiceUpdatePayload) {
         this.#send(ClientOpCodes.VoiceUpdate, data);
     }
 
-    sendPlay(data: PlayPayload) {
-        this.#send(ClientOpCodes.Play, data);
-    }
-
-    sendPause(guildId: string) {
-        this.#send(ClientOpCodes.Pause, { guild_id: guildId });
-    }
-
-    sendResume(guildId: string) {
-        this.#send(ClientOpCodes.Resume, { guild_id: guildId });
-    }
-
-    sendStop(guildId: string) {
-        this.#send(ClientOpCodes.Stop, { guild_id: guildId });
-    }
-
-    sendSeek(data: SeekPayload) {
-        this.#send(ClientOpCodes.Seek, data);
-    }
-
-    sendDisconnect(guildId: string) {
-        this.#send(ClientOpCodes.Disconnect, { guild_id: guildId });
-    }
-
-    sendVolume(data: VolumePayload) {
-        this.#send(ClientOpCodes.Volume, data);
-    }
-
     sendPlayerMigrate(guildId: string) {
         this.#send(ClientOpCodes.PlayerMigrate, { guild_id: guildId });
+    }
+
+    async sendPlay(guildId: string, data: PlayPayload) {
+        await this.rest.post(Routes.play(this.#requireSession(), guildId), data);
+    }
+
+    async sendPause(guildId: string) {
+        await this.rest.post(Routes.pause(this.#requireSession(), guildId));
+    }
+
+    async sendResume(guildId: string) {
+        await this.rest.post(Routes.resume(this.#requireSession(), guildId));
+    }
+
+    async sendStop(guildId: string) {
+        await this.rest.post(Routes.stop(this.#requireSession(), guildId));
+    }
+
+    async sendSeek(guildId: string, data: SeekPayload) {
+        await this.rest.post(Routes.seek(this.#requireSession(), guildId), data);
+    }
+
+    async sendVolume(guildId: string, data: VolumePayload) {
+        await this.rest.patch(Routes.volume(this.#requireSession(), guildId), data);
+    }
+
+    async sendDisconnect(guildId: string) {
+        await this.rest.delete(Routes.disconnect(this.#requireSession(), guildId));
+    }
+
+    #requireSession(): string {
+        if (!this.#sessionId) {
+            throw new Error(`Node ${this.name} has no active session`);
+        }
+        return this.#sessionId;
     }
 
     #send<T extends ClientOpCodes>(op: T, data: Extract<ClientMessage, { op: T; }>["d"]) {

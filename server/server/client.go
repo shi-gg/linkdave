@@ -37,9 +37,6 @@ type Client struct {
 	sessionID  string
 	clientName string
 
-	clientId   snowflake.ID
-	identified bool
-
 	players   map[snowflake.ID]*Player
 	playersMu sync.RWMutex
 
@@ -166,6 +163,20 @@ func (c *Client) removePlayer(guildID snowflake.ID) {
 	c.playersMu.Lock()
 	defer c.playersMu.Unlock()
 	delete(c.players, guildID)
+}
+
+func (c *Client) destroyAllPlayers() {
+	c.playersMu.Lock()
+	guildIDs := make([]snowflake.ID, 0, len(c.players))
+	for id := range c.players {
+		guildIDs = append(guildIDs, id)
+	}
+	c.players = make(map[snowflake.ID]*Player)
+	c.playersMu.Unlock()
+
+	for _, guildID := range guildIDs {
+		c.server.voiceManager.Disconnect(c.sessionID, guildID)
+	}
 }
 
 func (p *Player) GetState() string {

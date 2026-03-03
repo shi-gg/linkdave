@@ -7,8 +7,7 @@ services:
         container_name: linkdave
         restart: unless-stopped
         ports:
-            - "18080:8080" # WebSocket server
-            - "18081:8081" # Health check endpoint
+            - "18080:8080"
         healthcheck:
             test:
                 [

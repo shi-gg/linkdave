@@ -20,7 +20,7 @@ import {
 export type SendToShardFn = (guildId: string, payload: GatewayVoiceStateUpdate) => void;
 
 export interface LinkDaveClientOptions {
-    clientId: string;
+    token: string;
     nodes?: NodeOptions[];
     sendToShard: SendToShardFn;
 }
@@ -42,7 +42,7 @@ export class LinkDaveClient extends EventEmitter {
 
     constructor(options: LinkDaveClientOptions) {
         super();
-        this.#clientId = options.clientId;
+        this.#clientId = Buffer.from(options.token.split(".")[0]!, "base64").toString();
         this.#sendToShard = options.sendToShard;
 
         if (options.nodes) {
@@ -83,7 +83,7 @@ export class LinkDaveClient extends EventEmitter {
 
     async connectAll() {
         const promises = Array.from(this.#nodes.values(), (node) =>
-            node.connect(this.#clientId).catch(() => {
+            node.connect().catch(() => {
                 // Ignore connection errors during initial connect
             }));
 
@@ -159,16 +159,16 @@ export class LinkDaveClient extends EventEmitter {
         return this.#clientId;
     }
 
-    handleRaw({ t: event, d: data }: GatewayDispatchPayload) {
+    async handleRaw({ t: event, d: data }: GatewayDispatchPayload) {
         switch (event) {
             case GatewayDispatchEvents.VoiceStateUpdate: {
-                // I am not sure in what cases guild_id would be null, DMs maybe?
                 // https://discord.com/developers/docs/resources/voice#voice-state-object
                 if (!data.guild_id) return;
                 if (data.user_id !== this.#clientId) return;
 
                 const player = this.#players.get(data.guild_id);
-                player?.handleVoiceStateUpdate({
+                await player?.handleVoiceStateUpdate({
+                    user_id: data.user_id,
                     channel_id: data.channel_id,
                     session_id: data.session_id
                 });
@@ -177,7 +177,7 @@ export class LinkDaveClient extends EventEmitter {
             }
             case GatewayDispatchEvents.VoiceServerUpdate: {
                 const player = this.#players.get(data.guild_id);
-                player?.handleVoiceServerUpdate(data);
+                await player?.handleVoiceServerUpdate(data);
 
                 break;
             }
@@ -236,7 +236,7 @@ export class LinkDaveClient extends EventEmitter {
 
             const targetNode = this.#findMigrationTarget(node);
             if (!targetNode) {
-                player.destroy();
+                void player.destroy();
                 continue;
             }
 
@@ -271,13 +271,15 @@ export class LinkDaveClient extends EventEmitter {
         return bestNode;
     }
 
-    #handleClose(node: Node, data: ClosePayload) {
+    async #handleClose(node: Node, data: ClosePayload) {
         this.emit(EventName.Close, data);
 
+        const promises = [];
         for (const player of this.#players.values()) {
             if (player.node !== node) continue;
-            player.destroy();
+            promises.push(player.destroy());
         }
+        await Promise.all(promises);
     }
 
     _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node) {

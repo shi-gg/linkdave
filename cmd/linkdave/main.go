@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	defaultWSPort   = ":8080"
-	defaultHTTPPort = ":8081"
+	defaultPort     = ":8080"
 	version         = "1.0.0"
 	drainTimeoutSec = 30 // Time to wait for players to migrate before force shutdown
 )
@@ -30,54 +29,33 @@ func main() {
 		slog.String("version", version),
 	)
 
-	wsPort := os.Getenv("LINKDAVE_WS_PORT")
-	if wsPort == "" {
-		wsPort = defaultWSPort
-	}
-
-	httpPort := os.Getenv("LINKDAVE_HTTP_PORT")
-	if httpPort == "" {
-		httpPort = defaultHTTPPort
+	port := os.Getenv("LINKDAVE_PORT")
+	if port == "" {
+		port = defaultPort
 	}
 
 	voiceManager := voice.NewManager(logger)
 	wsServer := server.NewServer(logger, voiceManager)
 
-	wsMux := http.NewServeMux()
-	wsMux.HandleFunc("/ws", wsServer.HandleWebSocket)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", wsServer.HandleWebSocket)
+	mux.Handle("/health", server.NewHealthHandler(wsServer, version))
+	mux.Handle("/stats", server.NewStatsHandler(wsServer))
+	wsServer.RegisterRoutes(mux)
 
-	httpMux := http.NewServeMux()
-	httpMux.Handle("/health", server.NewHealthHandler(wsServer, version))
-	httpMux.Handle("/stats", server.NewStatsHandler(wsServer))
-
-	wsHTTPServer := &http.Server{
-		Addr:         wsPort,
-		Handler:      wsMux,
+	httpServer := &http.Server{
+		Addr:         port,
+		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	healthHTTPServer := &http.Server{
-		Addr:         httpPort,
-		Handler:      httpMux,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-		IdleTimeout:  30 * time.Second,
-	}
-
-	errChan := make(chan error, 2)
+	errChan := make(chan error, 1)
 
 	go func() {
-		logger.Info("websocket server listening", slog.String("addr", wsPort))
-		if err := wsHTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errChan <- err
-		}
-	}()
-
-	go func() {
-		logger.Info("health server listening", slog.String("addr", httpPort))
-		if err := healthHTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		logger.Info("server listening", slog.String("addr", port))
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errChan <- err
 		}
 	}()
@@ -124,11 +102,8 @@ DrainLoop:
 
 	voiceManager.Close()
 
-	if err := wsHTTPServer.Shutdown(ctx); err != nil {
-		logger.Error("websocket server shutdown error", slog.Any("error", err))
-	}
-	if err := healthHTTPServer.Shutdown(ctx); err != nil {
-		logger.Error("health server shutdown error", slog.Any("error", err))
+	if err := httpServer.Shutdown(ctx); err != nil {
+		logger.Error("server shutdown error", slog.Any("error", err))
 	}
 
 	logger.Info("linkdave stopped")

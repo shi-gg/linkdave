@@ -10,8 +10,8 @@ type Message struct {
 	Data any   `json:"d,omitempty"`
 }
 
-type IdentifyData struct {
-	ClientId snowflake.ID `json:"bot_id"`
+type ErrorResponse struct {
+	Error string `json:"error"`
 }
 
 type VoiceServerEvent struct {
@@ -21,6 +21,7 @@ type VoiceServerEvent struct {
 }
 
 type VoiceUpdateData struct {
+	ClientID  snowflake.ID     `json:"client_id"`
 	GuildID   snowflake.ID     `json:"guild_id"`
 	ChannelID snowflake.ID     `json:"channel_id"`
 	SessionID string           `json:"session_id"`

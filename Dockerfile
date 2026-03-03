@@ -59,6 +59,6 @@ RUN ldconfig
 RUN useradd -m -s /bin/bash linkdave
 USER linkdave
 
-EXPOSE 8080 8081
+EXPOSE 8080
 
 ENTRYPOINT ["linkdave"]
