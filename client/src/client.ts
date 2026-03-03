@@ -91,12 +91,8 @@ export class LinkDaveClient extends EventEmitter {
     }
 
     async connectAll() {
-        const promises = Array.from(this.#nodes.values(), (node) =>
-            node.connect().catch(() => {
-                // Ignore connection errors during initial connect
-            }));
-
-        await Promise.all(promises);
+        const promises = Array.from(this.#nodes.values(), (node) => node.connect());
+        await Promise.allSettled(promises);
     }
 
     disconnectAll() {
@@ -252,7 +248,7 @@ export class LinkDaveClient extends EventEmitter {
 
             promises.push(player.moveNode(targetNode));
         }
-        await Promise.all(promises);
+        await Promise.allSettled(promises);
     }
 
     #handleMigrateReady(_node: Node, data: MigrateReadyPayload) {
@@ -290,7 +286,7 @@ export class LinkDaveClient extends EventEmitter {
             if (player.node !== node) continue;
             promises.push(player.destroy());
         }
-        await Promise.all(promises);
+        await Promise.allSettled(promises);
     }
 
     _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node) {

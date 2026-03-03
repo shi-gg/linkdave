@@ -15,6 +15,7 @@ import {
     Routes,
     ServerOpCodes
 } from "./types.js";
+import { unwrap } from "./utils.js";
 
 export interface NodeOptions {
     name: string;
@@ -219,11 +220,7 @@ export class Node extends EventEmitter {
 
         this.#reconnectTimeout = setTimeout(() => {
             this.#reconnectTimeout = null;
-
-            void this.connect().catch(() => {
-                // Ignore connection errors during reconnection
-                // onClose will handle scheduling the next attempt
-            });
+            void unwrap(this.connect());
         }, delay);
     }
 
