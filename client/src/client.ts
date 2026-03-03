@@ -266,7 +266,7 @@ export class LinkDaveClient extends EventEmitter {
         return bestNode;
     }
 
-    #handleClose(node: Node, data: { code: number; reason: string }) {
+    #handleClose(node: Node, data: { code: number; reason: string; }) {
         this.emit(EventName.Close, data);
 
         for (const [guildId, player] of this.#players) {
