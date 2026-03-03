@@ -159,8 +159,6 @@ export class Node extends EventEmitter {
     }
 
     #handleMessage(message: ServerMessage) {
-        // eslint-disable-next-line no-console
-        if (message.op !== ServerOpCodes.Stats) console.log(EventName[ServerOpCodes[message.op] as "Ready"], message);
         switch (message.op) {
             case ServerOpCodes.Ready:
                 this.#sessionId = message.d.session_id;
