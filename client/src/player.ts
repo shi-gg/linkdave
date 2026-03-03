@@ -73,10 +73,6 @@ export class Player {
         return this.#voiceChannelId;
     }
 
-    set voiceChannelId(id: string | null) {
-        this.#voiceChannelId = id;
-    }
-
     get state() {
         return this.#state;
     }
@@ -103,6 +99,10 @@ export class Player {
 
     get paused() {
         return this.#state === PlayerState.Paused;
+    }
+
+    get connected() {
+        return this.#voiceState !== null;
     }
 
     connect(channelId?: string) {
@@ -146,7 +146,13 @@ export class Player {
     handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
         if (!data.channel_id) {
             // Left voice channel
+            this.#voiceState = null;
             this.#pendingVoice = null;
+
+            if (this.#node.connected) {
+                this.#node.sendDisconnect(this.#guildId);
+            }
+
             return;
         }
 
@@ -161,6 +167,20 @@ export class Player {
     // You should attempt to disconnect from the currently connected voice server,
     // and not attempt to reconnect until a new voice server is allocated.
     handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
+        if (!data.endpoint) {
+            this.#voiceState = null;
+
+            if (this.#pendingVoice) {
+                delete this.#pendingVoice.serverEvent;
+            }
+
+            if (this.#node.connected) {
+                this.#node.sendDisconnect(this.#guildId);
+            }
+
+            return;
+        }
+
         this.#pendingVoice ??= {};
 
         const endpoint = data.endpoint || this.#pendingVoice.serverEvent?.endpoint;
@@ -247,7 +267,11 @@ export class Player {
 
     destroy() {
         this.disconnect();
-        this.#node.sendDisconnect(this.#guildId);
+
+        if (this.#node.connected) {
+            this.#node.sendDisconnect(this.#guildId);
+        }
+
         this.#client.removePlayer(this.#guildId);
     }
 

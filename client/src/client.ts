@@ -5,6 +5,7 @@ import { EventEmitter } from "node:events";
 import { Node, type NodeOptions } from "./node.js";
 import { Player, type PlayerOptions } from "./player.js";
 import type {
+    ClosePayload,
     Events,
     ManagerEvents,
     MigrateReadyPayload,
@@ -115,9 +116,7 @@ export class LinkDaveClient extends EventEmitter {
 
     getPlayer(guildId: string, options?: Omit<PlayerOptions, "guildId">) {
         let player = this.#players.get(guildId);
-        if (player) {
-            return player;
-        }
+        if (player) return player;
 
         const node = this.getBestNode();
         if (!node) {
@@ -125,6 +124,7 @@ export class LinkDaveClient extends EventEmitter {
         }
 
         player = new Player(this, guildId, node, options);
+
         this.#players.set(guildId, player);
         node.incrementPlayerCount();
 
@@ -137,8 +137,13 @@ export class LinkDaveClient extends EventEmitter {
             return false;
         }
 
+        if (player.connected) {
+            throw new Error(`Cannot remove player for guild "${guildId}" while it is still connected`);
+        }
+
         player.node.decrementPlayerCount();
         this.#players.delete(guildId);
+
         return true;
     }
 
@@ -199,7 +204,7 @@ export class LinkDaveClient extends EventEmitter {
         node.on(EventName.NodeDraining, (data) => this.#handleNodeDraining(node, data));
         node.on(EventName.MigrateReady, (data) => this.#handleMigrateReady(node, data));
 
-        node.on(EventName.Close, (data) => this.emit(EventName.Close, data));
+        node.on(EventName.Close, (data) => this.#handleClose(node, data));
         node.on(EventName.Error, (data) => this.emit(EventName.Error, data));
     }
 
@@ -211,8 +216,6 @@ export class LinkDaveClient extends EventEmitter {
     ) {
         const player = this.#players.get(guildId);
         if (player?.node !== node) return;
-
-        // handle voice connect and disconnect to delete player automatically, later
 
         this.emit(event, data as ManagerEvents[K]);
     }
@@ -266,6 +269,15 @@ export class LinkDaveClient extends EventEmitter {
         }
 
         return bestNode;
+    }
+
+    #handleClose(node: Node, data: ClosePayload) {
+        this.emit(EventName.Close, data);
+
+        for (const player of this.#players.values()) {
+            if (player.node !== node) continue;
+            player.destroy();
+        }
     }
 
     _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node) {

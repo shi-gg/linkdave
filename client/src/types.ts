@@ -178,6 +178,11 @@ export interface MigrateReadyPayload {
     state: PlayerState;
 }
 
+export interface ClosePayload {
+    code: number;
+    reason: string;
+}
+
 export enum EventName {
     Ready = "ready",
     PlayerUpdate = "playerUpdate",
@@ -209,7 +214,7 @@ export interface Events {
     [EventName.Stats]: StatsPayload;
     [EventName.NodeDraining]: NodeDrainingPayload;
     [EventName.MigrateReady]: MigrateReadyPayload;
-    [EventName.Close]: { code: number; reason: string; };
+    [EventName.Close]: ClosePayload;
     [EventName.Error]: Error;
 }
 
