@@ -133,6 +133,11 @@ func (s *Server) OnVoiceDisconnected(sessionID string, guildID snowflake.ID) {
 }
 
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if s.IsDraining() {
+		http.Error(w, "Node is draining", http.StatusServiceUnavailable)
+		return
+	}
+
 	clientName := r.Header.Get("Client-Name")
 	if clientName == "" {
 		clientName = "unknown"
