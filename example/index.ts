@@ -31,6 +31,7 @@ linkdave.on(EventName.TrackStart, (d) => console.log(`Playing: ${d.track.url}`))
 linkdave.on(EventName.TrackEnd, (d) => console.log(`Track ended: ${d.reason}`));
 linkdave.on(EventName.TrackError, (d) => console.error(`Error: ${d.error}`));
 linkdave.on(EventName.VoiceConnect, (d) => console.log(`Voice connected: ${d.channel_id}`));
+linkdave.on(EventName.Close, (d) => console.log(`Connection closed: ${d.code} ${d.reason}`));
 linkdave.on(EventName.Error, console.error);
 
 discord.on(Events.ClientReady, async () => {

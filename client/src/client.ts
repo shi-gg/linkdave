@@ -199,7 +199,7 @@ export class LinkDaveClient extends EventEmitter {
         node.on(EventName.NodeDraining, (data) => this.#handleNodeDraining(node, data));
         node.on(EventName.MigrateReady, (data) => this.#handleMigrateReady(node, data));
 
-        node.on(EventName.Close, (data) => this.emit(EventName.Close, data));
+        node.on(EventName.Close, (data) => this.#handleClose(node, data));
         node.on(EventName.Error, (data) => this.emit(EventName.Error, data));
     }
 
@@ -211,8 +211,6 @@ export class LinkDaveClient extends EventEmitter {
     ) {
         const player = this.#players.get(guildId);
         if (player?.node !== node) return;
-
-        // handle voice connect and disconnect to delete player automatically, later
 
         this.emit(event, data as ManagerEvents[K]);
     }
@@ -266,6 +264,18 @@ export class LinkDaveClient extends EventEmitter {
         }
 
         return bestNode;
+    }
+
+    #handleClose(node: Node, data: { code: number; reason: string }) {
+        this.emit(EventName.Close, data);
+
+        for (const [guildId, player] of this.#players) {
+            if (player.node !== node) continue;
+
+            player.disconnect();
+            this.#players.delete(guildId);
+            node.decrementPlayerCount();
+        }
     }
 
     _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node) {
