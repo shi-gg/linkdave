@@ -247,7 +247,6 @@ export class Node extends EventEmitter {
 
         clearInterval(this.#pingInterval);
         this.#pingInterval = null;
-
     }
 
     #sendIdentify() {

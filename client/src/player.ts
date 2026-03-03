@@ -101,6 +101,10 @@ export class Player {
         return this.#state === PlayerState.Paused;
     }
 
+    get connected() {
+        return this.#voiceState !== null;
+    }
+
     connect(channelId?: string) {
         const targetChannel = channelId ?? this.#voiceChannelId;
         if (!targetChannel) {

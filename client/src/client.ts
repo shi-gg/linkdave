@@ -5,6 +5,7 @@ import { EventEmitter } from "node:events";
 import { Node, type NodeOptions } from "./node.js";
 import { Player, type PlayerOptions } from "./player.js";
 import type {
+    ClosePayload,
     Events,
     ManagerEvents,
     MigrateReadyPayload,
@@ -115,9 +116,7 @@ export class LinkDaveClient extends EventEmitter {
 
     getPlayer(guildId: string, options?: Omit<PlayerOptions, "guildId">) {
         let player = this.#players.get(guildId);
-        if (player) {
-            return player;
-        }
+        if (player) return player;
 
         const node = this.getBestNode();
         if (!node) {
@@ -125,6 +124,7 @@ export class LinkDaveClient extends EventEmitter {
         }
 
         player = new Player(this, guildId, node, options);
+
         this.#players.set(guildId, player);
         node.incrementPlayerCount();
 
@@ -137,8 +137,13 @@ export class LinkDaveClient extends EventEmitter {
             return false;
         }
 
+        if (player.connected) {
+            throw new Error(`Cannot remove player for guild "${guildId}" while it is still connected`);
+        }
+
         player.node.decrementPlayerCount();
         this.#players.delete(guildId);
+
         return true;
     }
 
@@ -266,15 +271,14 @@ export class LinkDaveClient extends EventEmitter {
         return bestNode;
     }
 
-    #handleClose(node: Node, data: { code: number; reason: string; }) {
+    #handleClose(node: Node, data: ClosePayload) {
         this.emit(EventName.Close, data);
 
         for (const [guildId, player] of this.#players) {
             if (player.node !== node) continue;
 
             player.disconnect();
-            this.#players.delete(guildId);
-            node.decrementPlayerCount();
+            this.removePlayer(guildId);
         }
     }
 
