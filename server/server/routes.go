@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/shi-gg/linkdave/server/audio"
 	"github.com/shi-gg/linkdave/server/protocol"
 )
 
@@ -45,11 +46,7 @@ func (s *Server) withSession(next sessionHandler) http.HandlerFunc {
 }
 
 func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.ResponseWriter, r *http.Request) {
-	var play struct {
-		URL       string `json:"url"`
-		StartTime int64  `json:"start_time,omitempty"`
-		Volume    int    `json:"volume,omitempty"`
-	}
+	var play protocol.RequestPlay
 	if err := json.NewDecoder(r.Body).Decode(&play); err != nil {
 		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: "invalid request body"})
 		return
@@ -60,50 +57,48 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 		player.SetVolume(play.Volume)
 	}
 
+	ok, err := audio.ValidateHost(play.URL)
+	if !ok {
+		s.logger.Error("host validation failed", slog.String("url", play.URL), slog.Any("error", err))
+		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: "invalid URL: " + err.Error()})
+		return
+	}
+
 	s.logger.Info("play requested",
 		slog.String("guild_id", guildID.String()),
 		slog.String("url", play.URL),
 	)
 
-	go func() {
-		source, err := s.voiceManager.Play(context.Background(), client.sessionID, guildID, play.URL, play.StartTime)
-		if err != nil {
-			s.logger.Error("playback failed", slog.Any("error", err))
-			client.send(protocol.Message{
-				Op: protocol.OpTrackError,
-				Data: protocol.TrackErrorData{
-					GuildID: guildID,
-					Track:   protocol.TrackInfo{URL: play.URL},
-					Error:   err.Error(),
-				},
-			})
-			return
-		}
+	source, err := s.voiceManager.Play(context.Background(), client.sessionID, guildID, play.URL, play.StartTime)
+	if err != nil {
+		s.logger.Error("playback failed", slog.Any("error", err))
+		writeJSON(w, http.StatusInternalServerError, protocol.ErrorResponse{Error: err.Error()})
+		return
+	}
 
-		player.SetPlayingState(play.URL, play.StartTime)
+	player.SetPlayingState(play.URL, play.StartTime)
 
-		state, position, volume := player.GetPlayerUpdateData()
-		client.send(protocol.Message{
-			Op: protocol.OpTrackStart,
-			Data: protocol.TrackStartData{
-				GuildID: guildID,
-				Track: protocol.TrackInfo{
-					URL:      source.URL(),
-					Duration: source.Duration(),
-				},
+	state, position, volume := player.GetPlayerUpdateData()
+	client.send(protocol.Message{
+		Op: protocol.OpTrackStart,
+		Data: protocol.TrackStartData{
+			GuildID: guildID,
+			Track: protocol.TrackInfo{
+				URL:      source.URL(),
+				Duration: source.Duration(),
 			},
-		})
+		},
+	})
 
-		client.send(protocol.Message{
-			Op: protocol.OpPlayerUpdate,
-			Data: protocol.PlayerUpdateData{
-				GuildID:  guildID,
-				State:    state,
-				Position: position,
-				Volume:   volume,
-			},
-		})
-	}()
+	client.send(protocol.Message{
+		Op: protocol.OpPlayerUpdate,
+		Data: protocol.PlayerUpdateData{
+			GuildID:  guildID,
+			State:    state,
+			Position: position,
+			Volume:   volume,
+		},
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -198,9 +193,7 @@ func (s *Server) routeStop(client *Client, guildID snowflake.ID, w http.Response
 }
 
 func (s *Server) routeSeek(client *Client, guildID snowflake.ID, w http.ResponseWriter, r *http.Request) {
-	var seek struct {
-		Position int64 `json:"position"`
-	}
+	var seek protocol.RequestSeek
 	if err := json.NewDecoder(r.Body).Decode(&seek); err != nil {
 		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: "invalid request body"})
 		return
@@ -236,9 +229,7 @@ func (s *Server) routeSeek(client *Client, guildID snowflake.ID, w http.Response
 }
 
 func (s *Server) routeVolume(client *Client, guildID snowflake.ID, w http.ResponseWriter, r *http.Request) {
-	var vol struct {
-		Volume int `json:"volume"`
-	}
+	var vol protocol.RequestVolume
 	if err := json.NewDecoder(r.Body).Decode(&vol); err != nil {
 		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: "invalid request body"})
 		return
