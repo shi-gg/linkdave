@@ -15,6 +15,7 @@ import {
     Routes,
     ServerOpCodes
 } from "./types.js";
+import { unwrap } from "./utils.js";
 
 export interface NodeOptions {
     name: string;
@@ -94,7 +95,7 @@ export class Node extends EventEmitter {
 
             const onError = (event: Event) => {
                 const message = "message" in event ? String((event as { message: unknown; }).message) : "unknown";
-                const error = new Error(`WebSocket error: ${message}`);
+                const error = new Error(`WebSocket error: ${message} (attempt ${this.#reconnectAttempts + 1}/${this.#options.maxReconnectAttempts})`);
                 this.emit(EventName.Error, error);
                 reject(error);
             };
@@ -136,7 +137,7 @@ export class Node extends EventEmitter {
     }
 
     get connected() {
-        return this.#state === NodeState.Connected;
+        return this.#state === NodeState.Connected || this.#state === NodeState.Draining;
     }
 
     incrementPlayerCount() {
@@ -219,11 +220,7 @@ export class Node extends EventEmitter {
 
         this.#reconnectTimeout = setTimeout(() => {
             this.#reconnectTimeout = null;
-
-            void this.connect().catch(() => {
-                // Ignore connection errors during reconnection
-                // onClose will handle scheduling the next attempt
-            });
+            void unwrap(this.connect());
         }, delay);
     }
 

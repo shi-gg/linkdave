@@ -91,12 +91,8 @@ export class LinkDaveClient extends EventEmitter {
     }
 
     async connectAll() {
-        const promises = Array.from(this.#nodes.values(), (node) =>
-            node.connect().catch(() => {
-                // Ignore connection errors during initial connect
-            }));
-
-        await Promise.all(promises);
+        const promises = Array.from(this.#nodes.values(), (node) => node.connect());
+        await Promise.allSettled(promises);
     }
 
     disconnectAll() {
@@ -237,20 +233,22 @@ export class LinkDaveClient extends EventEmitter {
         this.emit(EventName.PlayerUpdate, data);
     }
 
-    #handleNodeDraining(node: Node, data: NodeDrainingPayload) {
+    async #handleNodeDraining(node: Node, data: NodeDrainingPayload) {
         this.emit(EventName.NodeDraining, data);
 
+        const promises = [];
         for (const player of this.#players.values()) {
             if (player.node !== node) continue;
 
             const targetNode = this.#findMigrationTarget(node);
             if (!targetNode) {
-                void player.destroy();
+                promises.push(player.destroy());
                 continue;
             }
 
-            void player.moveNode(targetNode);
+            promises.push(player.moveNode(targetNode));
         }
+        await Promise.allSettled(promises);
     }
 
     #handleMigrateReady(_node: Node, data: MigrateReadyPayload) {
@@ -288,7 +286,7 @@ export class LinkDaveClient extends EventEmitter {
             if (player.node !== node) continue;
             promises.push(player.destroy());
         }
-        await Promise.all(promises);
+        await Promise.allSettled(promises);
     }
 
     _updatePlayerNode(guildId: string, oldNode: Node, newNode: Node) {
