@@ -52,7 +52,7 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 		return
 	}
 
-	player := client.getOrCreatePlayer(guildID)
+	player := client.getPlayer(guildID)
 	if play.Volume > 0 {
 		player.SetVolume(play.Volume)
 	}
