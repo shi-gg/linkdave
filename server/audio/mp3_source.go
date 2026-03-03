@@ -12,24 +12,86 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
+	"unsafe"
 
 	"github.com/tosone/minimp3"
 	"gopkg.in/hraban/opus.v2"
 )
 
 const (
-	// Discord expects 48kHz, stereo, 20ms frames
-	opusSampleRate = 48000
+	opusSampleRate = 48000 // Discord expects 48kHz, stereo, 20ms frames
 	opusChannels   = 2
-	opusFrameSize  = 960 // 20ms at 48kHz (48000 * 0.020)
-	// PCM bytes needed for one opus frame: 960 samples * 2 channels * 2 bytes/sample
-	pcmFrameBytes = opusFrameSize * opusChannels * 2
+	opusFrameSize  = 960                              // 20ms at 48kHz (48000 * 0.020)
+	pcmFrameBytes  = opusFrameSize * opusChannels * 2 // PCM bytes needed for one opus frame: 960 samples * 2 channels * 2 bytes/sample
+	idleTimeout    = 10 * time.Second
 )
 
-var client = &http.Client{
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	},
+var baseTransport = &http.Transport{
+	ResponseHeaderTimeout: 5 * time.Second,
+	DialContext: (&net.Dialer{
+		Timeout:   5 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext,
+}
+
+var clientByIP sync.Map
+
+func clientForIP(ip string) *http.Client {
+	if v, ok := clientByIP.Load(ip); ok {
+		return v.(*http.Client)
+	}
+
+	dialer := &net.Dialer{
+		Timeout:   5 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	transport := baseTransport.Clone()
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		_, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			port = "443"
+		}
+		return dialer.DialContext(ctx, network, net.JoinHostPort(ip, port))
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	if clientForIp, loaded := clientByIP.LoadOrStore(ip, client); loaded {
+		return clientForIp.(*http.Client)
+	}
+
+	return client
+}
+
+type idleTimeoutReader struct {
+	body  io.ReadCloser
+	timer *time.Timer
+}
+
+func newIdleTimeoutReader(body io.ReadCloser) *idleTimeoutReader {
+	r := &idleTimeoutReader{body: body}
+	r.timer = time.AfterFunc(idleTimeout, func() { _ = body.Close() })
+	return r
+}
+
+func (r *idleTimeoutReader) Read(p []byte) (int, error) {
+	n, err := r.body.Read(p)
+	if n > 0 {
+		r.timer.Reset(idleTimeout)
+	}
+	return n, err
+}
+
+func (r *idleTimeoutReader) Close() error {
+	r.timer.Stop()
+	return r.body.Close()
 }
 
 type MP3Source struct {
@@ -60,20 +122,13 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 		return nil, fmt.Errorf("parse URL: %w", err)
 	}
 
-	requestURL := *parsedURL
-	requestURL.Host = ip
-	if parsedURL.Port() != "" {
-		requestURL.Host = net.JoinHostPort(ip, parsedURL.Port())
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", requestURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", parsedURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "LinkDave/1.0")
-	req.Host = parsedURL.Host
 
-	resp, err := client.Do(req)
+	resp, err := clientForIP(ip).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch audio: %w", err)
 	}
@@ -83,10 +138,12 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
 
+	body := newIdleTimeoutReader(resp.Body)
+
 	rawProbe := make([]byte, 4096)
-	rn, err := io.ReadFull(resp.Body, rawProbe)
+	rn, err := io.ReadFull(body, rawProbe)
 	if err != nil && err != io.ErrUnexpectedEOF {
-		resp.Body.Close()
+		body.Close()
 		return nil, fmt.Errorf("read initial data: %w", err)
 	}
 	rawProbe = rawProbe[:rn]
@@ -94,8 +151,8 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 	xingFrames := parseXingFrames(rawProbe)
 
 	reader := &prefixedReadCloser{
-		Reader: io.MultiReader(bytes.NewReader(rawProbe), resp.Body),
-		closer: resp.Body,
+		Reader: io.MultiReader(bytes.NewReader(rawProbe), body),
+		closer: body,
 	}
 
 	source, err := NewMP3SourceFromReader(reader, urlStr, startTimeMs)
@@ -125,9 +182,15 @@ func (r *prefixedReadCloser) Close() error {
 	return r.closer.Close()
 }
 
+var (
+	tagXing = []byte("Xing")
+	tagInfo = []byte("Info")
+	tagVBRI = []byte("VBRI")
+)
+
 func parseXingFrames(data []byte) int64 {
-	for _, tag := range []string{"Xing", "Info"} {
-		idx := bytes.Index(data, []byte(tag))
+	for _, tag := range [2][]byte{tagXing, tagInfo} {
+		idx := bytes.Index(data, tag)
 		if idx < 0 || idx+8 > len(data) {
 			continue
 		}
@@ -141,7 +204,7 @@ func parseXingFrames(data []byte) int64 {
 		}
 	}
 
-	if idx := bytes.Index(data, []byte("VBRI")); idx >= 0 && idx+18 <= len(data) {
+	if idx := bytes.Index(data, tagVBRI); idx >= 0 && idx+18 <= len(data) {
 		return int64(binary.BigEndian.Uint32(data[idx+14:]))
 	}
 
@@ -237,17 +300,15 @@ func (s *MP3Source) ProvideOpusFrame() ([]byte, error) {
 	}
 
 	numSamplesPerChannel := len(s.pcmBuffer) / (s.srcChannels * 2)
+	rawSamples := unsafe.Slice((*int16)(unsafe.Pointer(&s.pcmBuffer[0])), len(s.pcmBuffer)/2)
 	if s.srcChannels == 1 {
 		for i := range numSamplesPerChannel {
-			sample := int16(binary.LittleEndian.Uint16(s.pcmBuffer[i*2:]))
+			sample := rawSamples[i]
 			s.inputSamples[i*2] = sample
 			s.inputSamples[i*2+1] = sample
 		}
 	} else {
-		numSamples := len(s.pcmBuffer) / 2
-		for i := range numSamples {
-			s.inputSamples[i] = int16(binary.LittleEndian.Uint16(s.pcmBuffer[i*2:]))
-		}
+		copy(s.inputSamples, rawSamples)
 	}
 
 	if s.resampleRatio != 1.0 {
@@ -270,31 +331,27 @@ func (s *MP3Source) resampleLinear(input, output []int16) {
 	inputLen := len(input) / opusChannels
 	outputLen := len(output) / opusChannels
 
+	step := (inputLen << 16) / outputLen
+
 	for i := range outputLen {
-		srcPos := float64(i) / s.resampleRatio
-		srcIdx := int(srcPos)
-		frac := srcPos - float64(srcIdx)
+		fp := i * step
+		srcIdx := fp >> 16
+		frac := fp & 0xffff
 
 		if srcIdx >= inputLen-1 {
 			srcIdx = inputLen - 2
-			frac = 1.0
-		}
-		if srcIdx < 0 {
-			srcIdx = 0
-			frac = 0.0
+			frac = 0xffff
 		}
 
 		for ch := range opusChannels {
 			idx0 := srcIdx*opusChannels + ch
-			idx1 := (srcIdx+1)*opusChannels + ch
+			idx1 := idx0 + opusChannels
 			if idx1 >= len(input) {
 				idx1 = idx0
 			}
-
-			sample0 := float64(input[idx0])
-			sample1 := float64(input[idx1])
-			interpolated := sample0 + frac*(sample1-sample0)
-			output[i*opusChannels+ch] = int16(interpolated)
+			s0 := int32(input[idx0])
+			s1 := int32(input[idx1])
+			output[i*opusChannels+ch] = int16(s0 + ((s1 - s0) * int32(frac) >> 16))
 		}
 	}
 }
