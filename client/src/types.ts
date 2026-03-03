@@ -1,20 +1,20 @@
 import type { Node } from "./node.js";
 
 export enum ClientOpCodes {
+    Ping = 0,
     VoiceUpdate = 1,
-    Ping = 8,
-    PlayerMigrate = 10
+    PlayerMigrate = 2
 }
 
 export enum ServerOpCodes {
-    Ready = 0,
-    PlayerUpdate = 1,
-    TrackStart = 2,
-    TrackEnd = 3,
-    TrackError = 4,
-    VoiceConnect = 5,
-    VoiceDisconnect = 6,
-    Pong = 7,
+    Pong = 0,
+    Ready = 1,
+    VoiceConnect = 2,
+    VoiceDisconnect = 3,
+    PlayerUpdate = 4,
+    TrackStart = 5,
+    TrackEnd = 6,
+    TrackError = 7,
     Stats = 8,
     NodeDraining = 9,
     MigrateReady = 10
