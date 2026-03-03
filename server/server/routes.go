@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/disgoorg/snowflake/v2"
-	"github.com/shi-gg/linkdave/server/audio"
 	"github.com/shi-gg/linkdave/server/protocol"
 )
 
@@ -55,13 +55,6 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 	player := client.getOrCreatePlayer(guildID)
 	if play.Volume > 0 {
 		player.SetVolume(play.Volume)
-	}
-
-	ok, err := audio.ValidateHost(play.URL)
-	if !ok {
-		s.logger.Error("host validation failed", slog.String("url", play.URL), slog.Any("error", err))
-		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: "invalid URL: " + err.Error()})
-		return
 	}
 
 	s.logger.Info("play requested",
@@ -207,6 +200,12 @@ func (s *Server) routeSeek(client *Client, guildID snowflake.ID, w http.Response
 
 	if err := s.voiceManager.Seek(client.sessionID, guildID, seek.Position); err != nil {
 		s.logger.Error("failed to seek", slog.Any("error", err))
+
+		if strings.Contains(err.Error(), "not supported") {
+			writeJSON(w, http.StatusNotImplemented, protocol.ErrorResponse{Error: err.Error()})
+			return
+		}
+
 		writeJSON(w, http.StatusInternalServerError, protocol.ErrorResponse{Error: err.Error()})
 		return
 	}
