@@ -51,7 +51,7 @@ func clientForIP(ip string) *http.Client {
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		_, port, err := net.SplitHostPort(addr)
 		if err != nil {
-			port = "443"
+			return nil, fmt.Errorf("failed to parse address %q: %w", addr, err)
 		}
 		return dialer.DialContext(ctx, network, net.JoinHostPort(ip, port))
 	}
