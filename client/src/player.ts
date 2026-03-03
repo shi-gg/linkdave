@@ -148,7 +148,11 @@ export class Player {
             // Left voice channel
             this.#voiceState = null;
             this.#pendingVoice = null;
-            this.#node.sendDisconnect(this.#guildId);
+
+            if (this.#node.connected) {
+                this.#node.sendDisconnect(this.#guildId);
+            }
+
             return;
         }
 
@@ -170,7 +174,10 @@ export class Player {
                 delete this.#pendingVoice.serverEvent;
             }
 
-            this.#node.sendDisconnect(this.#guildId);
+            if (this.#node.connected) {
+                this.#node.sendDisconnect(this.#guildId);
+            }
+
             return;
         }
 
@@ -260,7 +267,11 @@ export class Player {
 
     destroy() {
         this.disconnect();
-        this.#node.sendDisconnect(this.#guildId);
+
+        if (this.#node.connected) {
+            this.#node.sendDisconnect(this.#guildId);
+        }
+
         this.#client.removePlayer(this.#guildId);
     }
 

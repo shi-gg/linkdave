@@ -274,11 +274,9 @@ export class LinkDaveClient extends EventEmitter {
     #handleClose(node: Node, data: ClosePayload) {
         this.emit(EventName.Close, data);
 
-        for (const [guildId, player] of this.#players) {
+        for (const player of this.#players.values()) {
             if (player.node !== node) continue;
-
-            player.disconnect();
-            this.removePlayer(guildId);
+            player.destroy();
         }
     }
 
