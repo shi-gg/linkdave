@@ -1,28 +1,20 @@
 import type { Node } from "./node.js";
 
 export enum ClientOpCodes {
-    Identify = 0,
+    Ping = 0,
     VoiceUpdate = 1,
-    Play = 2,
-    Pause = 3,
-    Resume = 4,
-    Stop = 5,
-    Seek = 6,
-    Disconnect = 7,
-    Ping = 8,
-    Volume = 9,
-    PlayerMigrate = 10
+    PlayerMigrate = 2
 }
 
 export enum ServerOpCodes {
-    Ready = 0,
-    PlayerUpdate = 1,
-    TrackStart = 2,
-    TrackEnd = 3,
-    TrackError = 4,
-    VoiceConnect = 5,
-    VoiceDisconnect = 6,
-    Pong = 7,
+    Pong = 0,
+    Ready = 1,
+    VoiceConnect = 2,
+    VoiceDisconnect = 3,
+    PlayerUpdate = 4,
+    TrackStart = 5,
+    TrackEnd = 6,
+    TrackError = 7,
     Stats = 8,
     NodeDraining = 9,
     MigrateReady = 10
@@ -56,21 +48,9 @@ export type ServerMessage =
     | { op: ServerOpCodes.MigrateReady; d: MigrateReadyPayload; };
 
 export type ClientMessage =
-    | { op: ClientOpCodes.Identify; d: IdentifyPayload; }
     | { op: ClientOpCodes.VoiceUpdate; d: VoiceUpdatePayload; }
-    | { op: ClientOpCodes.Play; d: PlayPayload; }
-    | { op: ClientOpCodes.Pause; d: GuildPayload; }
-    | { op: ClientOpCodes.Resume; d: GuildPayload; }
-    | { op: ClientOpCodes.Stop; d: GuildPayload; }
-    | { op: ClientOpCodes.Seek; d: SeekPayload; }
-    | { op: ClientOpCodes.Disconnect; d: GuildPayload; }
     | { op: ClientOpCodes.Ping; d?: undefined; }
-    | { op: ClientOpCodes.Volume; d: VolumePayload; }
     | { op: ClientOpCodes.PlayerMigrate; d: PlayerMigratePayload; };
-
-export interface IdentifyPayload {
-    bot_id: string;
-}
 
 export interface VoiceServerEvent {
     token: string;
@@ -79,6 +59,7 @@ export interface VoiceServerEvent {
 }
 
 export interface VoiceUpdatePayload {
+    client_id: string;
     guild_id: string;
     channel_id: string;
     session_id: string;
@@ -86,7 +67,6 @@ export interface VoiceUpdatePayload {
 }
 
 export interface PlayPayload {
-    guild_id: string;
     url: string;
     start_time?: number;
     volume?: number;
@@ -97,12 +77,10 @@ export interface GuildPayload {
 }
 
 export interface SeekPayload {
-    guild_id: string;
     position: number;
 }
 
 export interface VolumePayload {
-    guild_id: string;
     volume: number;
 }
 
@@ -229,3 +207,19 @@ export interface ManagerEvents extends Events {
     [ManagerEventName.NodeRemove]: { node: Node; };
     [ManagerEventName.NodeReconnectAttempt]: { node: Node; attempt: number; };
 }
+
+export interface RESTError {
+    error: string;
+}
+
+export type RESTResponse<T = undefined> = T extends undefined ? undefined : T;
+
+export const Routes = {
+    play: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/play` as const,
+    pause: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/pause` as const,
+    resume: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/resume` as const,
+    stop: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/stop` as const,
+    seek: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/seek` as const,
+    volume: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/volume` as const,
+    disconnect: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}` as const
+} as const;

@@ -5,13 +5,15 @@ import type { Node } from "./node.js";
 import type {
     MigrateReadyPayload,
     PlayerUpdatePayload,
-    PlayPayload,
     TrackInfo,
+    VoiceConnectPayload,
     VoiceServerEvent
 } from "./types.js";
 import {
+    EventName,
     PlayerState
 } from "./types.js";
+import { unwrap } from "./utils.js";
 
 export interface PlayOptions {
     startTime?: number;
@@ -24,7 +26,7 @@ export interface PlayerOptions {
     selfDeaf?: boolean;
 }
 
-export type RawVoiceStateUpdate = Pick<GatewayVoiceStateUpdateDispatchData, "channel_id" | "session_id">;
+export type RawVoiceStateUpdate = Pick<GatewayVoiceStateUpdateDispatchData, "user_id" | "channel_id" | "session_id">;
 export type RawVoiceServerUpdate = Pick<GatewayVoiceServerUpdateDispatchData, "token" | "guild_id" | "endpoint">;
 
 interface VoiceState {
@@ -143,14 +145,14 @@ export class Player {
         this.#pendingVoice = null;
     }
 
-    handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
+    async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
         if (!data.channel_id) {
-            // Left voice channel
+            this.#voiceChannelId = null;
             this.#voiceState = null;
             this.#pendingVoice = null;
 
             if (this.#node.connected) {
-                this.#node.sendDisconnect(this.#guildId);
+                await unwrap(this.#node.sendDisconnect(this.#guildId));
             }
 
             return;
@@ -166,7 +168,7 @@ export class Player {
     // A null endpoint means that the voice server allocated has gone away and is trying to be reallocated.
     // You should attempt to disconnect from the currently connected voice server,
     // and not attempt to reconnect until a new voice server is allocated.
-    handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
+    async handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
         if (!data.endpoint) {
             this.#voiceState = null;
 
@@ -175,7 +177,7 @@ export class Player {
             }
 
             if (this.#node.connected) {
-                this.#node.sendDisconnect(this.#guildId);
+                await unwrap(this.#node.sendDisconnect(this.#guildId));
             }
 
             return;
@@ -211,6 +213,7 @@ export class Player {
         this.#voiceState = { channelId, sessionId, event };
 
         this.#node.sendVoiceUpdate({
+            client_id: this.#client.clientId,
             guild_id: this.#guildId,
             channel_id: channelId,
             session_id: sessionId,
@@ -218,58 +221,43 @@ export class Player {
         });
     }
 
-    play(url: string, options: PlayOptions = {}) {
-        const payload: PlayPayload = {
-            guild_id: this.#guildId,
-            url
-        };
-
-        if (options.startTime !== undefined) {
-            payload.start_time = options.startTime;
-        }
-
-        if (options.volume !== undefined) {
-            payload.volume = options.volume;
-        }
-
-        this.#node.sendPlay(payload);
+    async play(url: string, options: PlayOptions = {}) {
+        await this.#node.sendPlay(this.#guildId, {
+            url,
+            ...(options.startTime !== undefined && { start_time: options.startTime }),
+            ...(options.volume !== undefined && { volume: options.volume })
+        });
     }
 
-    pause() {
-        this.#node.sendPause(this.#guildId);
+    async pause() {
+        await this.#node.sendPause(this.#guildId);
     }
 
-    resume() {
-        this.#node.sendResume(this.#guildId);
+    async resume() {
+        await this.#node.sendResume(this.#guildId);
     }
 
-    stop() {
-        this.#node.sendStop(this.#guildId);
+    async stop() {
+        await this.#node.sendStop(this.#guildId);
         this.#currentTrack = null;
         this.#state = PlayerState.Idle;
         this.#position = 0;
     }
 
-    seek(position: number) {
-        this.#node.sendSeek({
-            guild_id: this.#guildId,
-            position
-        });
+    async seek(position: number) {
+        await this.#node.sendSeek(this.#guildId, { position });
     }
 
-    setVolume(volume: number) {
+    async setVolume(volume: number) {
         this.#volume = Math.max(0, Math.min(1_000, volume));
-        this.#node.sendVolume({
-            guild_id: this.#guildId,
-            volume: this.#volume
-        });
+        await this.#node.sendVolume(this.#guildId, { volume: this.#volume });
     }
 
-    destroy() {
+    async destroy() {
         this.disconnect();
 
         if (this.#node.connected) {
-            this.#node.sendDisconnect(this.#guildId);
+            await unwrap(this.#node.sendDisconnect(this.#guildId));
         }
 
         this.#client.removePlayer(this.#guildId);
@@ -309,12 +297,12 @@ export class Player {
         const oldNode = this.#node;
 
         // Don't send disconnect to old node - we're migrating
-        // Don't send disconnect to old node - we're migrating
         this.#client._updatePlayerNode(this.#guildId, oldNode, targetNode);
         this.#node = targetNode;
 
         if (this.#voiceState) {
             this.#node.sendVoiceUpdate({
+                client_id: this.#client.clientId,
                 guild_id: this.#guildId,
                 channel_id: this.#voiceState.channelId,
                 session_id: this.#voiceState.sessionId,
@@ -323,12 +311,19 @@ export class Player {
         }
 
         if (data.state === PlayerState.Playing && data.url) {
-            this.#node.sendPlay({
-                guild_id: this.#guildId,
+            const playData = {
                 url: data.url,
                 start_time: data.position,
                 volume: data.volume
-            });
+            };
+
+            // Wait for voice connection on the new node before playing
+            const onVoiceConnect = (event: VoiceConnectPayload) => {
+                if (event.guild_id !== this.#guildId) return;
+                this.#node.off(EventName.VoiceConnect, onVoiceConnect);
+                void this.#node.sendPlay(this.#guildId, playData);
+            };
+            this.#node.on(EventName.VoiceConnect, onVoiceConnect);
         }
 
         this.#migrationTarget = null;

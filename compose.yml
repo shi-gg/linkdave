@@ -7,8 +7,7 @@ services:
         container_name: linkdave
         restart: unless-stopped
         ports:
-            - "18080:8080" # WebSocket server
-            - "18081:8081" # Health check endpoint
+            - "18080:8080"
         healthcheck:
             test:
                 [
@@ -17,7 +16,7 @@ services:
                     "--no-verbose",
                     "--tries=1",
                     "--spider",
-                    "http://localhost:8081/health",
+                    "http://localhost:8080/health",
                 ]
             interval: 30s
             timeout: 3s
@@ -31,4 +30,3 @@ services:
         environment:
             LINKDAVE_SOURCE_HTTPS_ENABLED: true
             LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED: true
-            LINKDAVE_SOURCE_IP_ADDRESS_PRIVATE_ENABLED: true

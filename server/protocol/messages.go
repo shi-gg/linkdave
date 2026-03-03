@@ -4,14 +4,13 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 )
 
-// Message is the base WebSocket message structure
 type Message struct {
 	Op   uint8 `json:"op"`
 	Data any   `json:"d,omitempty"`
 }
 
-type IdentifyData struct {
-	ClientId snowflake.ID `json:"bot_id"`
+type ErrorResponse struct {
+	Error string `json:"error"`
 }
 
 type VoiceServerEvent struct {
@@ -21,6 +20,7 @@ type VoiceServerEvent struct {
 }
 
 type VoiceUpdateData struct {
+	ClientID  snowflake.ID     `json:"client_id"`
 	GuildID   snowflake.ID     `json:"guild_id"`
 	ChannelID snowflake.ID     `json:"channel_id"`
 	SessionID string           `json:"session_id"`
@@ -118,4 +118,18 @@ type MigrateReadyData struct {
 	Position int64        `json:"position"`
 	Volume   int          `json:"volume"`
 	State    string       `json:"state"`
+}
+
+type RequestPlay struct {
+	URL       string `json:"url"`
+	StartTime int64  `json:"start_time,omitempty"`
+	Volume    int    `json:"volume,omitempty"`
+}
+
+type RequestSeek struct {
+	Position int64 `json:"position"`
+}
+
+type RequestVolume struct {
+	Volume int `json:"volume"`
 }

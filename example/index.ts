@@ -17,8 +17,11 @@ const discord = new Client({
 });
 
 const linkdave = new LinkDaveClient({
-    clientId: "1116414956972290119",
-    nodes: [{ name: "main", url: "ws://localhost:18080" }],
+    token: DISCORD_TOKEN,
+    nodes: [
+        { name: "main", url: "ws://localhost:18080" },
+        // { name: "sec", url: "ws://localhost:18090" }
+    ],
     sendToShard: (guildId, payload) => {
         discord.guilds.cache.get(guildId)?.shard.send(payload);
     }
@@ -60,12 +63,13 @@ discord.on(Events.MessageCreate, async (msg) => {
     if (!player) return;
 
     switch (cmd) {
-        case "!play": player.play(args[0]); break;
-        case "!pause": player.pause(); break;
-        case "!resume": player.resume(); break;
-        case "!stop": player.stop(); break;
-        case "!leave": player.destroy(); break;
-        case "!volume": player.setVolume(parseInt(args[0], 10) * 10); break;
+        case "!play": await player.play(args[0]); break;
+        case "!pause": await player.pause(); break;
+        case "!resume": await player.resume(); break;
+        case "!stop": await player.stop(); break;
+        case "!leave": await player.destroy(); break;
+        case "!volume": await player.setVolume(parseInt(args[0], 10) * 10); break;
+        case "!get-channel": await msg.reply(`Current channel: <#${player.voiceChannelId}>`); break;
     }
 });
 
@@ -74,5 +78,8 @@ process.on("SIGINT", () => {
     discord.destroy();
     process.exit(0);
 });
+
+process.on("uncaughtException", console.error);
+process.on("unhandledRejection", console.error);
 
 discord.login(DISCORD_TOKEN);
