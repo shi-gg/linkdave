@@ -35,6 +35,13 @@ func (s *Server) withSession(next sessionHandler) http.HandlerFunc {
 			return
 		}
 
+		select {
+		case <-client.closeChan:
+			writeJSON(w, http.StatusNotFound, protocol.ErrorResponse{Error: "session has been closed"})
+			return
+		default:
+		}
+
 		guildID, err := snowflake.Parse(guildIDStr)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: "invalid guild_id"})
@@ -53,6 +60,11 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 	}
 
 	player := client.getPlayer(guildID)
+	if player == nil {
+		writeJSON(w, http.StatusNotFound, protocol.ErrorResponse{Error: "player not found"})
+		return
+	}
+
 	if play.Volume > 0 {
 		player.SetVolume(play.Volume)
 	}
