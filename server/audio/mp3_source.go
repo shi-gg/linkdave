@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 
@@ -52,12 +54,24 @@ type MP3Source struct {
 	mutex    sync.Mutex
 }
 
-func NewMP3Source(ctx context.Context, urlStr string, startTimeMs int64) (*MP3Source, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*MP3Source, error) {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse URL: %w", err)
+	}
+
+	requestURL := *parsedURL
+	requestURL.Host = ip
+	if parsedURL.Port() != "" {
+		requestURL.Host = net.JoinHostPort(ip, parsedURL.Port())
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", requestURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "LinkDave/1.0")
+	req.Host = parsedURL.Host
 
 	resp, err := client.Do(req)
 	if err != nil {
