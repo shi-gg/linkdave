@@ -17,6 +17,8 @@ import {
     ManagerEventName
 } from "./types.js";
 
+const CLIENT_ID_REGEX = /^\d{15,21}$/;
+
 export type SendToShardFn = (guildId: string, payload: GatewayVoiceStateUpdate) => void;
 
 export interface LinkDaveClientOptions {
@@ -42,8 +44,15 @@ export class LinkDaveClient extends EventEmitter {
 
     constructor(options: LinkDaveClientOptions) {
         super();
-        this.#clientId = Buffer.from(options.token.split(".")[0]!, "base64").toString();
         this.#sendToShard = options.sendToShard;
+
+        this.#clientId = Buffer
+            .from(options.token.split(".")[0]!, "base64")
+            .toString();
+
+        if (!CLIENT_ID_REGEX.test(this.#clientId)) {
+            throw new Error("Invalid token provided: decoded client ID is not a valid snowflake.");
+        }
 
         if (options.nodes) {
             for (const nodeOpts of options.nodes) {
