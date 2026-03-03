@@ -13,10 +13,6 @@ func ValidateHost(urlStr string) (string, error) {
 		return "", fmt.Errorf("parse URL: %w", err)
 	}
 
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return parsedURL.Hostname(), nil
-	}
-
 	switch parsedURL.Scheme {
 	case "http":
 		if !config.HTTPEnabled {
