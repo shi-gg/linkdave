@@ -20,7 +20,7 @@ var (
 )
 
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/health", s.rotueHealth)
+	mux.HandleFunc("/health", s.routeHealth)
 	mux.HandleFunc("/stats", s.routeStats)
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/play", s.withSession(s.routePlay))
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/pause", s.withSession(s.routePause))
@@ -61,7 +61,7 @@ func (s *Server) withSession(next sessionHandler) http.HandlerFunc {
 	}
 }
 
-func (s *Server) rotueHealth(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) routeHealth(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
