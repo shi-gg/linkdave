@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	PORT             = ":8080"
-	DRAIN_TIMEOUT_MS = 30_000 // Time to wait for players to migrate before force shutdown
+	PORT              = ":8080"
+	DRAIN_TIMEOUT_SEC = 30 // Time to wait for players to migrate before force shutdown
 )
 
 var version = os.Getenv("VERSION")
@@ -64,9 +64,9 @@ func main() {
 		logger.Error("server error", slog.Any("error", err))
 	}
 
-	server.Drain("shutdown", int64(DRAIN_TIMEOUT_MS))
+	server.Drain("shutdown", int64(DRAIN_TIMEOUT_SEC))
 
-	drainCtx, drainCancel := context.WithTimeout(context.Background(), DRAIN_TIMEOUT_MS)
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), DRAIN_TIMEOUT_SEC*time.Second)
 	defer drainCancel()
 
 	ticker := time.NewTicker(500 * time.Millisecond)
