@@ -108,6 +108,8 @@ export class Node extends EventEmitter {
     }
 
     disconnect() {
+        this.#state = NodeState.Disconnected;
+
         this.#stopPingInterval();
         this.#stopReconnect();
 
@@ -116,7 +118,6 @@ export class Node extends EventEmitter {
             this.#ws = null;
         }
 
-        this.#state = NodeState.Disconnected;
         this.#sessionId = null;
     }
 
