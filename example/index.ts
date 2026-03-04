@@ -54,7 +54,7 @@ discord.on(Events.MessageCreate, async (msg) => {
         }
 
         const player = linkdave.getPlayer(msg.guild.id);
-        player.connect(vc.id);
+        await player.connect(vc.id);
 
         void msg.reply(`Joining ${vc.name}...`);
     }
