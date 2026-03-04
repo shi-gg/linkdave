@@ -352,29 +352,39 @@ func (s *MP3Source) resampleLinear(input, output []int16) {
 
 	step := (inputLen << 16) / outputLen
 
+	if inputLen < 2 {
+		for ch := range OPUS_CHANNELS {
+			val := int16(0)
+			if len(input) > ch {
+				val = input[ch]
+			}
+			for i := range outputLen {
+				output[i*OPUS_CHANNELS+ch] = val
+			}
+		}
+		return
+	}
+
 	for i := range outputLen {
 		fp := i * step
 		srcIdx := fp >> 16
-		frac := fp & 0xffff
+		frac := int32(fp & 0xffff)
 
 		if srcIdx >= inputLen-1 {
 			srcIdx = inputLen - 2
 			frac = 0xffff
 		}
 
-		for ch := range OPUS_CHANNELS {
-			idx0 := srcIdx*OPUS_CHANNELS + ch
-			idx1 := idx0 + OPUS_CHANNELS
+		base0 := srcIdx * OPUS_CHANNELS
+		base1 := base0 + OPUS_CHANNELS
 
-			if idx1 >= len(input) {
-				idx1 = idx0
-			}
+		s0_0 := int32(input[base0])
+		s1_0 := int32(input[base1])
+		output[i*OPUS_CHANNELS] = int16(s0_0 + ((s1_0 - s0_0) * frac >> 16))
 
-			s0 := int32(input[idx0])
-			s1 := int32(input[idx1])
-
-			output[i*OPUS_CHANNELS+ch] = int16(s0 + ((s1 - s0) * int32(frac) >> 16))
-		}
+		s0_1 := int32(input[base0+1])
+		s1_1 := int32(input[base1+1])
+		output[i*OPUS_CHANNELS+1] = int16(s0_1 + ((s1_1 - s0_1) * frac >> 16))
 	}
 }
 
