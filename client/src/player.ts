@@ -9,10 +9,7 @@ import type {
     VoiceConnectPayload,
     VoiceServerEvent
 } from "./types.js";
-import {
-    EventName,
-    PlayerState
-} from "./types.js";
+import { EventName, PlayerState } from "./types.js";
 import { unwrap } from "./utils.js";
 
 export interface PlayOptions {
@@ -42,6 +39,8 @@ interface PendingVoiceState {
 }
 
 export class Player {
+    public static readonly CONNECT_TIMEOUT = 10_000;
+
     readonly #client: LinkDaveClient;
     readonly #guildId: string;
     #node: Node;
@@ -107,7 +106,7 @@ export class Player {
         return this.#voiceState !== null;
     }
 
-    connect(channelId?: string) {
+    connect(channelId?: string, timeoutMs = Player.CONNECT_TIMEOUT) {
         const targetChannel = channelId ?? this.#voiceChannelId;
         if (!targetChannel) {
             throw new RangeError("No voice channel ID provided");
@@ -123,6 +122,25 @@ export class Player {
                 self_mute: this.#selfMute,
                 self_deaf: this.#selfDeaf
             }
+        });
+
+        return new Promise<VoiceConnectPayload>((resolve, reject) => {
+            const timer = setTimeout(
+                () => {
+                    this.#node.off(EventName.VoiceConnect, onConnect);
+                    reject(new Error(`Voice connection timed out for guild "${this.#guildId}"`));
+                },
+                timeoutMs
+            );
+
+            const onConnect = (event: VoiceConnectPayload) => {
+                if (event.guild_id !== this.#guildId) return;
+                this.#node.off(EventName.VoiceConnect, onConnect);
+                clearTimeout(timer);
+                resolve(event);
+            };
+
+            this.#node.on(EventName.VoiceConnect, onConnect);
         });
     }
 
