@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	defaultPort     = ":8080"
-	version         = "1.0.0"
-	drainTimeoutSec = 30 // Time to wait for players to migrate before force shutdown
+	PORT              = ":8080"
+	DRAIN_TIMEOUT_SEC = 30 // Time to wait for players to migrate before force shutdown
 )
+
+var version = os.Getenv("VERSION")
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -29,22 +30,15 @@ func main() {
 		slog.String("version", version),
 	)
 
-	port := os.Getenv("LINKDAVE_PORT")
-	if port == "" {
-		port = defaultPort
-	}
-
 	voiceManager := voice.NewManager(logger)
-	wsServer := server.NewServer(logger, voiceManager)
+	server := server.NewServer(logger, voiceManager)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", wsServer.HandleWebSocket)
-	mux.Handle("/health", server.NewHealthHandler(wsServer, version))
-	mux.Handle("/stats", server.NewStatsHandler(wsServer))
-	wsServer.RegisterRoutes(mux)
+	mux.HandleFunc("/ws", server.HandleWebSocket)
+	server.RegisterRoutes(mux)
 
 	httpServer := &http.Server{
-		Addr:         port,
+		Addr:         PORT,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -54,7 +48,7 @@ func main() {
 	errChan := make(chan error, 1)
 
 	go func() {
-		logger.Info("server listening", slog.String("addr", port))
+		logger.Info("server listening", slog.String("addr", PORT))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errChan <- err
 		}
@@ -70,10 +64,9 @@ func main() {
 		logger.Error("server error", slog.Any("error", err))
 	}
 
-	drainDeadline := drainTimeoutSec * 1000
-	wsServer.Drain("shutdown", int64(drainDeadline))
+	server.Drain("shutdown", int64(DRAIN_TIMEOUT_SEC))
 
-	drainCtx, drainCancel := context.WithTimeout(context.Background(), time.Duration(drainTimeoutSec)*time.Second)
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), DRAIN_TIMEOUT_SEC*time.Second)
 	defer drainCancel()
 
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -86,7 +79,7 @@ DrainLoop:
 			logger.Warn("drain timeout reached, forcing shutdown")
 			break DrainLoop
 		case <-ticker.C:
-			playerCount := wsServer.PlayerCount()
+			playerCount := server.PlayerCount()
 			if playerCount == 0 {
 				logger.Info("all players migrated successfully")
 				break DrainLoop

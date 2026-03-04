@@ -20,18 +20,37 @@ import (
 )
 
 const (
-	opusSampleRate = 48000 // Discord expects 48kHz, stereo, 20ms frames
-	opusChannels   = 2
-	opusFrameSize  = 960                              // 20ms at 48kHz (48000 * 0.020)
-	pcmFrameBytes  = opusFrameSize * opusChannels * 2 // PCM bytes needed for one opus frame: 960 samples * 2 channels * 2 bytes/sample
-	idleTimeout    = 10 * time.Second
+	OPUS_SAMPLE_RATE       = 48000 // Discord expects 48kHz, stereo, 20ms frames
+	OPUS_CHANNELS          = 2
+	OPUS_FRAME_SIZE        = 960                                       // 20ms at 48kHz (48000 * 0.020)
+	OPUS_FRAME_DURATION_MS = OPUS_FRAME_SIZE * 1000 / OPUS_SAMPLE_RATE // 20ms
+	OPUS_MAX_FRAME_BYTES   = 4000
+
+	IDLE_TIMEOUT       = 10 * time.Second
+	DIAL_TIMEOUT       = 5 * time.Second
+	KEEPALIVE_INTERVAL = 30 * time.Second
+
+	PROBE_SIZE = 4096
+
+	MPEG1_SAMPLES_PER_FRAME     = 1152
+	MPEG2_SAMPLES_PER_FRAME     = 576
+	MPEG2_SAMPLE_RATE_THRESHOLD = 32000
+
+	XING_FLAGS_OFFSET     = 4
+	XING_DATA_OFFSET      = 8
+	XING_FRAME_COUNT_SIZE = 4
+
+	VBRI_FRAME_COUNT_OFFSET = 14
+	VBRI_MIN_SIZE           = 18
+
+	BITS_PER_BYTE = 8
 )
 
 var baseTransport = &http.Transport{
-	ResponseHeaderTimeout: 5 * time.Second,
+	ResponseHeaderTimeout: DIAL_TIMEOUT,
 	DialContext: (&net.Dialer{
-		Timeout:   5 * time.Second,
-		KeepAlive: 30 * time.Second,
+		Timeout:   DIAL_TIMEOUT,
+		KeepAlive: KEEPALIVE_INTERVAL,
 	}).DialContext,
 }
 
@@ -43,8 +62,8 @@ func clientForIP(ip string) *http.Client {
 	}
 
 	dialer := &net.Dialer{
-		Timeout:   5 * time.Second,
-		KeepAlive: 30 * time.Second,
+		Timeout:   DIAL_TIMEOUT,
+		KeepAlive: KEEPALIVE_INTERVAL,
 	}
 
 	transport := baseTransport.Clone()
@@ -77,14 +96,14 @@ type idleTimeoutReader struct {
 
 func newIdleTimeoutReader(body io.ReadCloser) *idleTimeoutReader {
 	r := &idleTimeoutReader{body: body}
-	r.timer = time.AfterFunc(idleTimeout, func() { _ = body.Close() })
+	r.timer = time.AfterFunc(IDLE_TIMEOUT, func() { _ = body.Close() })
 	return r
 }
 
 func (r *idleTimeoutReader) Read(p []byte) (int, error) {
 	n, err := r.body.Read(p)
 	if n > 0 {
-		r.timer.Reset(idleTimeout)
+		r.timer.Reset(IDLE_TIMEOUT)
 	}
 	return n, err
 }
@@ -140,14 +159,14 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 
 	body := newIdleTimeoutReader(resp.Body)
 
-	rawProbe := make([]byte, 4096)
+	rawProbe := make([]byte, PROBE_SIZE)
 	rn, err := io.ReadFull(body, rawProbe)
 	if err != nil && err != io.ErrUnexpectedEOF {
 		body.Close()
 		return nil, fmt.Errorf("read initial data: %w", err)
 	}
-	rawProbe = rawProbe[:rn]
 
+	rawProbe = rawProbe[:rn]
 	xingFrames := parseXingFrames(rawProbe)
 
 	reader := &prefixedReadCloser{
@@ -161,13 +180,13 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 	}
 
 	if xingFrames > 0 && source.srcSampleRate > 0 {
-		samplesPerFrame := int64(1152) // MPEG1 Layer III
-		if source.srcSampleRate < 32000 {
-			samplesPerFrame = 576
+		samplesPerFrame := int64(MPEG1_SAMPLES_PER_FRAME)
+		if source.srcSampleRate < MPEG2_SAMPLE_RATE_THRESHOLD {
+			samplesPerFrame = MPEG2_SAMPLES_PER_FRAME
 		}
 		source.duration = xingFrames * samplesPerFrame * 1000 / int64(source.srcSampleRate)
 	} else if resp.ContentLength > 0 && source.decoder.Kbps > 0 {
-		source.duration = resp.ContentLength * 8 / int64(source.decoder.Kbps)
+		source.duration = resp.ContentLength * BITS_PER_BYTE / int64(source.decoder.Kbps)
 	}
 
 	return source, nil
@@ -191,21 +210,24 @@ var (
 func parseXingFrames(data []byte) int64 {
 	for _, tag := range [2][]byte{tagXing, tagInfo} {
 		idx := bytes.Index(data, tag)
-		if idx < 0 || idx+8 > len(data) {
+		if idx < 0 || idx+XING_DATA_OFFSET > len(data) {
 			continue
 		}
-		flags := binary.BigEndian.Uint32(data[idx+4:])
-		offset := idx + 8
+
+		flags := binary.BigEndian.Uint32(data[idx+XING_FLAGS_OFFSET:])
+		offset := idx + XING_DATA_OFFSET
+
 		if flags&1 != 0 {
-			if offset+4 > len(data) {
+			if offset+XING_FRAME_COUNT_SIZE > len(data) {
 				continue
 			}
+
 			return int64(binary.BigEndian.Uint32(data[offset:]))
 		}
 	}
 
-	if idx := bytes.Index(data, tagVBRI); idx >= 0 && idx+18 <= len(data) {
-		return int64(binary.BigEndian.Uint32(data[idx+14:]))
+	if idx := bytes.Index(data, tagVBRI); idx >= 0 && idx+VBRI_MIN_SIZE <= len(data) {
+		return int64(binary.BigEndian.Uint32(data[idx+VBRI_FRAME_COUNT_OFFSET:]))
 	}
 
 	return 0
@@ -218,7 +240,7 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 		return nil, fmt.Errorf("create mp3 decoder: %w", err)
 	}
 
-	probe := make([]byte, 4096)
+	probe := make([]byte, PROBE_SIZE)
 	n, err := decoder.Read(probe)
 	if err != nil && err != io.EOF {
 		decoder.Close()
@@ -239,9 +261,9 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 		return nil, fmt.Errorf("unsupported channel count: %d", srcChannels)
 	}
 
-	resampleRatio := float64(opusSampleRate) / float64(srcSampleRate)
+	resampleRatio := float64(OPUS_SAMPLE_RATE) / float64(srcSampleRate)
+	inputSamplesPerChannel := int(float64(OPUS_FRAME_SIZE) / resampleRatio)
 
-	inputSamplesPerChannel := int(float64(opusFrameSize) / resampleRatio)
 	if inputSamplesPerChannel < 1 {
 		inputSamplesPerChannel = 1
 	}
@@ -250,7 +272,7 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 	sampleAlign := srcChannels * 2
 	inputFrameBytes = ((inputFrameBytes + sampleAlign - 1) / sampleAlign) * sampleAlign
 
-	encoder, err := opus.NewEncoder(opusSampleRate, opusChannels, opus.AppAudio)
+	encoder, err := opus.NewEncoder(OPUS_SAMPLE_RATE, OPUS_CHANNELS, opus.AppAudio)
 	if err != nil {
 		decoder.Close()
 		reader.Close()
@@ -266,9 +288,9 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 		pcmReader:     pcmReader,
 		encoder:       encoder,
 		pcmBuffer:     make([]byte, inputFrameBytes),
-		inputSamples:  make([]int16, inputSamplesPerChannel*opusChannels),
-		pcmSamples:    make([]int16, opusFrameSize*opusChannels),
-		opusBuffer:    make([]byte, 4000),
+		inputSamples:  make([]int16, inputSamplesPerChannel*OPUS_CHANNELS),
+		pcmSamples:    make([]int16, OPUS_FRAME_SIZE*OPUS_CHANNELS),
+		opusBuffer:    make([]byte, OPUS_MAX_FRAME_BYTES),
 		srcSampleRate: srcSampleRate,
 		srcChannels:   srcChannels,
 		resampleRatio: resampleRatio,
@@ -283,24 +305,21 @@ func (s *MP3Source) ProvideOpusFrame() ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if s.closed.Load() {
+	if s.closed.Load() || len(s.pcmBuffer) == 0 {
 		return nil, io.EOF
 	}
 
-	n, err := io.ReadFull(s.pcmReader, s.pcmBuffer)
+	_, err := io.ReadFull(s.pcmReader, s.pcmBuffer)
 	if err != nil {
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			if n == 0 {
-				return nil, io.EOF
-			}
-			clear(s.pcmBuffer[n:])
-		} else {
-			return nil, fmt.Errorf("read pcm: %w", err)
+			return nil, io.EOF
 		}
+		return nil, fmt.Errorf("read pcm: %w", err)
 	}
 
 	numSamplesPerChannel := len(s.pcmBuffer) / (s.srcChannels * 2)
 	rawSamples := unsafe.Slice((*int16)(unsafe.Pointer(&s.pcmBuffer[0])), len(s.pcmBuffer)/2)
+
 	if s.srcChannels == 1 {
 		for i := range numSamplesPerChannel {
 			sample := rawSamples[i]
@@ -322,37 +341,50 @@ func (s *MP3Source) ProvideOpusFrame() ([]byte, error) {
 		return nil, fmt.Errorf("encode opus: %w", err)
 	}
 
-	s.position.Add(20)
+	s.position.Add(OPUS_FRAME_DURATION_MS)
 
 	return s.opusBuffer[:numBytes], nil
 }
 
 func (s *MP3Source) resampleLinear(input, output []int16) {
-	inputLen := len(input) / opusChannels
-	outputLen := len(output) / opusChannels
+	inputLen := len(input) / OPUS_CHANNELS
+	outputLen := len(output) / OPUS_CHANNELS
 
 	step := (inputLen << 16) / outputLen
+
+	if inputLen < 2 {
+		for ch := range OPUS_CHANNELS {
+			val := int16(0)
+			if len(input) > ch {
+				val = input[ch]
+			}
+			for i := range outputLen {
+				output[i*OPUS_CHANNELS+ch] = val
+			}
+		}
+		return
+	}
 
 	for i := range outputLen {
 		fp := i * step
 		srcIdx := fp >> 16
-		frac := fp & 0xffff
+		frac := int32(fp & 0xffff)
 
 		if srcIdx >= inputLen-1 {
 			srcIdx = inputLen - 2
 			frac = 0xffff
 		}
 
-		for ch := range opusChannels {
-			idx0 := srcIdx*opusChannels + ch
-			idx1 := idx0 + opusChannels
-			if idx1 >= len(input) {
-				idx1 = idx0
-			}
-			s0 := int32(input[idx0])
-			s1 := int32(input[idx1])
-			output[i*opusChannels+ch] = int16(s0 + ((s1 - s0) * int32(frac) >> 16))
-		}
+		base0 := srcIdx * OPUS_CHANNELS
+		base1 := base0 + OPUS_CHANNELS
+
+		s0_0 := int32(input[base0])
+		s1_0 := int32(input[base1])
+		output[i*OPUS_CHANNELS] = int16(s0_0 + ((s1_0 - s0_0) * frac >> 16))
+
+		s0_1 := int32(input[base0+1])
+		s1_1 := int32(input[base1+1])
+		output[i*OPUS_CHANNELS+1] = int16(s0_1 + ((s1_1 - s0_1) * frac >> 16))
 	}
 }
 
@@ -360,10 +392,13 @@ func (s *MP3Source) Close() {
 	if s.closed.Swap(true) {
 		return
 	}
+
+	s.body.Close()
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
 	s.decoder.Close()
-	s.body.Close()
 	s.decoder = nil
 	s.pcmReader = nil
 	s.body = nil

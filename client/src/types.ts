@@ -133,9 +133,7 @@ export interface StatsPayload {
     players: number;
     playing_tracks: number;
     uptime: number;
-    memory_used: number;
-    memory_alloc: number;
-    cpu_usage: number;
+    memory: number;
     draining: boolean;
 }
 
