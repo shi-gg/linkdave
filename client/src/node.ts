@@ -108,6 +108,8 @@ export class Node extends EventEmitter {
     }
 
     disconnect() {
+        this.#state = NodeState.Disconnected;
+
         this.#stopPingInterval();
         this.#stopReconnect();
 
@@ -116,7 +118,6 @@ export class Node extends EventEmitter {
             this.#ws = null;
         }
 
-        this.#state = NodeState.Disconnected;
         this.#sessionId = null;
     }
 
@@ -207,7 +208,7 @@ export class Node extends EventEmitter {
 
         this.emit(EventName.Close, { code: event.code, reason: event.reason });
 
-        if (this.#options.autoReconnect && !this.draining && this.#reconnectAttempts < this.#options.maxReconnectAttempts) {
+        if (event.code !== 1_000 && this.#options.autoReconnect && !this.draining && this.#reconnectAttempts < this.#options.maxReconnectAttempts) {
             this.#scheduleReconnect();
         }
     }

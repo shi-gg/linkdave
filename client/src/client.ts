@@ -152,10 +152,6 @@ export class LinkDaveClient extends EventEmitter {
         return true;
     }
 
-    getPlayerNode(guildId: string) {
-        return this.#players.get(guildId)?.node;
-    }
-
     get players(): ReadonlyMap<string, Player> {
         return this.#players;
     }

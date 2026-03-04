@@ -302,10 +302,6 @@ export class Player {
         this.#volume = data.volume;
     }
 
-    _setTrack(track: TrackInfo | null) {
-        this.#currentTrack = track;
-    }
-
     _onMigrateReady(data: MigrateReadyPayload) {
         if (!this.#migrationTarget || data.guild_id !== this.#guildId) {
             return;
