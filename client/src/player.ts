@@ -106,7 +106,7 @@ export class Player {
         return this.#voiceState !== null;
     }
 
-    connect(channelId?: string, timeoutMs = Player.CONNECT_TIMEOUT): Promise<VoiceConnectPayload> {
+    connect(channelId?: string, timeoutMs = Player.CONNECT_TIMEOUT) {
         const targetChannel = channelId ?? this.#voiceChannelId;
         if (!targetChannel) {
             throw new RangeError("No voice channel ID provided");
