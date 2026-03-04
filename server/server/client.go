@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512 * 1024 // 512KB
+	WRITE_TIMEOUT    = 10 * time.Second
+	PONG_TIMEOUT     = 60 * time.Second
+	PING_PERIOD      = (PONG_TIMEOUT * 9) / 10
+	MAX_MESSAGE_SIZE = 512 * 1024 // 512KB
 )
 
 type Player struct {
@@ -61,10 +61,10 @@ func (c *Client) readPump() {
 		c.close()
 	}()
 
-	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetReadLimit(MAX_MESSAGE_SIZE)
+	c.conn.SetReadDeadline(time.Now().Add(PONG_TIMEOUT))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		c.conn.SetReadDeadline(time.Now().Add(PONG_TIMEOUT))
 		return nil
 	})
 
@@ -81,7 +81,7 @@ func (c *Client) readPump() {
 }
 
 func (c *Client) writePump() {
-	ticker := time.NewTicker(pingPeriod)
+	ticker := time.NewTicker(PING_PERIOD)
 	defer func() {
 		ticker.Stop()
 		c.close()
@@ -90,7 +90,7 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.sendCh:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.conn.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT))
 			if !ok {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
@@ -108,7 +108,7 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.conn.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

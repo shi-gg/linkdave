@@ -50,7 +50,7 @@ jobs:
                   fi
 
             - name: Build Docker image
-              run: docker build -t ghcr.io/${REPOSITORY_OWNER}/${{ github.event.repository.name }}:latest -t ghcr.io/${REPOSITORY_OWNER}/${{ github.event.repository.name }}:${{ env.version }} .
+              run: docker build --build-arg BUILD_VERSION=${{ env.version }} -t ghcr.io/${REPOSITORY_OWNER}/${{ github.event.repository.name }}:latest -t ghcr.io/${REPOSITORY_OWNER}/${{ github.event.repository.name }}:${{ env.version }} .
 
             - name: Push Docker image
               if: env.publish == 'true'

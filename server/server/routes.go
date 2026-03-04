@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -12,7 +14,14 @@ import (
 	"github.com/shi-gg/linkdave/server/protocol"
 )
 
+var (
+	version   = os.Getenv("VERSION")
+	startTime = time.Now()
+)
+
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/health", s.rotueHealth)
+	mux.HandleFunc("/stats", s.routeStats)
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/play", s.withSession(s.routePlay))
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/pause", s.withSession(s.routePause))
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/resume", s.withSession(s.routeResume))
@@ -50,6 +59,25 @@ func (s *Server) withSession(next sessionHandler) http.HandlerFunc {
 
 		next(client, guildID, w, r)
 	}
+}
+
+func (s *Server) rotueHealth(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) routeStats(w http.ResponseWriter, _ *http.Request) {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	response := protocol.StatsResponse{
+		Version:      version,
+		Runtime:      runtime.Version(),
+		Uptime:       time.Since(startTime).Milliseconds(),
+		NumGoroutine: runtime.NumGoroutine(),
+		Memory:       memStats.Alloc,
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.ResponseWriter, r *http.Request) {

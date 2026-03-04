@@ -94,13 +94,11 @@ type VoiceDisconnectData struct {
 }
 
 type StatsData struct {
-	Players       int     `json:"players"`
-	PlayingTracks int     `json:"playing_tracks"`
-	Uptime        int64   `json:"uptime"`
-	MemoryUsed    uint64  `json:"memory_used"`
-	MemoryAlloc   uint64  `json:"memory_alloc"`
-	CPUUsage      float64 `json:"cpu_usage"`
-	Draining      bool    `json:"draining"`
+	Players       int    `json:"players"`
+	PlayingTracks int    `json:"playing_tracks"`
+	Uptime        int64  `json:"uptime"`
+	Memory        uint64 `json:"memory"`
+	Draining      bool   `json:"draining"`
 }
 
 type NodeDrainingData struct {
@@ -118,6 +116,14 @@ type MigrateReadyData struct {
 	Position int64        `json:"position"`
 	Volume   int          `json:"volume"`
 	State    string       `json:"state"`
+}
+
+type StatsResponse struct {
+	Version      string `json:"version"`
+	Runtime      string `json:"runtime"`
+	Uptime       int64  `json:"uptime_ms"`
+	NumGoroutine int    `json:"num_goroutines"`
+	Memory       uint64 `json:"memory"`
 }
 
 type RequestPlay struct {
