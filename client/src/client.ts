@@ -236,7 +236,7 @@ export class LinkDaveClient extends EventEmitter {
         for (const player of this.#players.values()) {
             if (player.node !== node) continue;
 
-            const targetNode = this.#findMigrationTarget(node);
+            const targetNode = this.getBestNode();
             if (!targetNode) {
                 promises.push(player.destroy());
                 continue;
@@ -254,24 +254,6 @@ export class LinkDaveClient extends EventEmitter {
         if (!player) return;
 
         player._onMigrateReady(data);
-    }
-
-    #findMigrationTarget(excludeNode: Node) {
-        let bestNode: Node | undefined;
-        let lowestCount = Infinity;
-
-        for (const node of this.#nodes.values()) {
-            if (node === excludeNode || !node.connected || node.draining) {
-                continue;
-            }
-
-            if (node.playerCount < lowestCount) {
-                lowestCount = node.playerCount;
-                bestNode = node;
-            }
-        }
-
-        return bestNode;
     }
 
     async #handleClose(node: Node, data: ClosePayload) {
