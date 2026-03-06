@@ -10,6 +10,7 @@ type SourceConfig struct {
 	HTTPSEnabled            bool
 	PublicIPAddressEnabled  bool
 	PrivateIPAddressEnabled bool
+	UserAgent               string
 }
 
 var config SourceConfig
@@ -20,6 +21,7 @@ func init() {
 		HTTPSEnabled:            getEnvBool("LINKDAVE_SOURCE_HTTPS_ENABLED", false),
 		PublicIPAddressEnabled:  getEnvBool("LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED", false),
 		PrivateIPAddressEnabled: getEnvBool("LINKDAVE_SOURCE_IP_ADDRESS_PRIVATE_ENABLED", false),
+		UserAgent:               "Linkdave/" + os.Getenv("VERSION"),
 	}
 }
 

@@ -3,3 +3,4 @@ export * from "./node.js";
 export * from "./player.js";
 export * from "./rest.js";
 export * from "./types.js";
+export * from "./utils.js";
