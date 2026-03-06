@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -66,8 +67,8 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 	}
 	defer resp.Body.Close()
 
-	if resp.Header.Get("Content-Type") != "application/json" {
-		return nil, errors.New("response type")
+	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
+		return nil, fmt.Errorf("content type")
 	}
 
 	body, err := io.ReadAll(resp.Body)
