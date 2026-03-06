@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type RequestBody struct {
@@ -29,6 +30,12 @@ type InvokeResponse struct {
 
 const (
 	HTTP_URL = "https://tts.wamellow.com/api/invoke"
+)
+
+var (
+	client = &http.Client{
+		Timeout: 10 * time.Second,
+	}
 )
 
 func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3Source, error) {
@@ -57,7 +64,7 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 	req.Header.Set("User-Agent", config.UserAgent)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch tts: %w", err)
 	}
