@@ -84,10 +84,6 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 		return nil, errors.New(data.Code)
 	}
 
-	if data.VStr == "" {
-		return nil, errors.New("empty audio data")
-	}
-
 	audioBytes, err := base64.StdEncoding.DecodeString(data.VStr)
 	if err != nil {
 		return nil, fmt.Errorf("decode base64 audio: %w", err)
