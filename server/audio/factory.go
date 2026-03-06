@@ -14,6 +14,9 @@ func NewDefaultFactory() *DefaultFactory {
 
 func (f *DefaultFactory) CreateFromURL(ctx context.Context, url string, startTimeMs int64) (Source, error) {
 	if strings.HasPrefix(url, "tts://") {
+		if !config.TextToSpeechEnabled {
+			return nil, fmt.Errorf("tts scheme is disabled")
+		}
 		return NewTTSSource(ctx, url, startTimeMs)
 	}
 

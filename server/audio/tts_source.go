@@ -28,10 +28,6 @@ type InvokeResponse struct {
 	Speaker  string `json:"speaker"`
 }
 
-const (
-	HTTP_URL = "https://tts.wamellow.com/api/invoke"
-)
-
 var (
 	client = &http.Client{
 		Timeout: 10 * time.Second,
@@ -56,7 +52,7 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 		return nil, fmt.Errorf("encode req body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", HTTP_URL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", config.TextToSpeechURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
