@@ -145,7 +145,8 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("User-Agent", "LinkDave/1.0")
+
+	req.Header.Set("User-Agent", config.UserAgent)
 
 	resp, err := clientForIP(ip).Do(req)
 	if err != nil {

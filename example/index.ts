@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
-import { EventName, LinkDaveClient } from "linkdave";
+import { constructUri, EventName, LinkDaveClient } from "linkdave";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN!;
 if (!DISCORD_TOKEN) {
@@ -64,6 +64,7 @@ discord.on(Events.MessageCreate, async (msg) => {
 
     switch (cmd) {
         case "!play": await player.play(args[0]); break;
+        case "!tts": await player.play(constructUri.tts(args.join(" "), "en_us_001")); break;
         case "!pause": await player.pause(); break;
         case "!resume": await player.resume(); break;
         case "!stop": await player.stop(); break;
