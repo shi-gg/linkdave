@@ -121,7 +121,6 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		},
 		voice.WithConnLogger(c.logger),
 		voice.WithConnDaveSessionCreateFunc(golibdave.NewSession),
-		voice.WithConnGatewayConfigOpts(voice.WithGatewayAutoReconnect(false)),
 	)
 
 	c.mutex.Lock()
