@@ -89,7 +89,7 @@ else changelog += `[compare changes](${REMOTE_URL}/commits/${TAG})\n\n`;
 for (const key of Object.keys(categories)) {
     const category = categories[key];
     if (category.items.length > 0) {
-        changelog += `${category.title}\n\n`;
+        changelog += `### ${category.title}\n\n`;
         changelog += category.items.join("\n") + "\n\n";
     }
 }
