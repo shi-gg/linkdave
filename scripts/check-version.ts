@@ -14,7 +14,9 @@ try {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "ignore"]
     }).trim();
-} catch { }
+} catch {
+    console.warn(`Could not get published version for '${PACKAGE_NAME}'.`);
+}
 
 console.log(`Current version:  ${VERSION}`);
 console.log(`Published version: ${publishedVersion}`);

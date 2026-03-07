@@ -21,7 +21,7 @@ function run(cmd: string) {
 }
 
 const REMOTE_URL = run("git config --get remote.origin.url").replace(STRIP_GIT_REGEX, "");
-const PREV_TAG = run("git describe --tags --abbrev=0");
+const PREV_TAG = run("git describe --tags --abbrev=0 || echo ''");
 
 const log = run(
     PREV_TAG
