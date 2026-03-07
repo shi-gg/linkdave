@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shi-gg/linkdave/server/audio"
 	"github.com/shi-gg/linkdave/server/server"
 	"github.com/shi-gg/linkdave/server/voice"
 )
@@ -18,7 +19,7 @@ const (
 	DRAIN_TIMEOUT_SEC = 30 // Time to wait for players to migrate before force shutdown
 )
 
-var version = os.Getenv("VERSION")
+var version = ""
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -30,8 +31,9 @@ func main() {
 		slog.String("version", version),
 	)
 
+	audio.SetVersion(version)
 	voiceManager := voice.NewManager(logger)
-	server := server.NewServer(logger, voiceManager)
+	server := server.NewServer(logger, voiceManager, version)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", server.HandleWebSocket)

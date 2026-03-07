@@ -41,7 +41,10 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o linkdave ./cmd/linkdave
+
+ARG BUILD_VERSION
+ENV VERSION=$BUILD_VERSION
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w -X main.version=${BUILD_VERSION}" -o linkdave ./cmd/linkdave
 
 FROM debian:trixie-slim
 
