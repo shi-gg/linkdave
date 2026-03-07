@@ -19,7 +19,7 @@ const discord = new Client({
 const linkdave = new LinkDaveClient({
     token: DISCORD_TOKEN,
     nodes: [
-        { name: "main", url: "ws://localhost:8080" },
+        { name: "main", url: "ws://localhost:18080" },
         // { name: "sec", url: "ws://localhost:18090" }
     ],
     sendToShard: (guildId, payload) => {
