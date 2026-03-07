@@ -1,0 +1,49 @@
+name: release
+
+on:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: write
+
+jobs:
+    release:
+        name: GitHub Release
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "latest"
+
+            - name: Check if package version changed
+              id: check_publish
+              run: bun ./scripts/check-version.ts
+
+            - name: Generate Changelog
+              if: env.publish == 'true'
+              run: bun ./scripts/generate-changelog.ts
+
+            - name: Extract Server Binary
+              if: env.publish == 'true'
+              run: |
+                  docker build --target builder --build-arg BUILD_VERSION=${{ env.version }} -t linkdave-builder:release .
+                  docker create --name extract-release linkdave-builder:release
+                  docker cp extract-release:/app/linkdave ./linkdave-linux-amd64
+                  docker rm extract-release
+                  chmod +x ./linkdave-linux-amd64
+
+            - name: Create Tag and Release
+              if: env.publish == 'true'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: "v${{ env.version }}"
+                  name: "v${{ env.version }}"
+                  body_path: "CHANGELOG.md"
+                  files: |
+                      linkdave-linux-amd64

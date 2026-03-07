@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -14,10 +13,7 @@ import (
 	"github.com/shi-gg/linkdave/server/protocol"
 )
 
-var (
-	version   = os.Getenv("VERSION")
-	startTime = time.Now()
-)
+var startTime = time.Now()
 
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/health", s.routeHealth)
@@ -70,7 +66,7 @@ func (s *Server) routeStats(w http.ResponseWriter, _ *http.Request) {
 	runtime.ReadMemStats(&memStats)
 
 	response := protocol.StatsResponse{
-		Version:      version,
+		Version:      s.version,
 		Runtime:      runtime.Version(),
 		Uptime:       time.Since(startTime).Milliseconds(),
 		NumGoroutine: runtime.NumGoroutine(),

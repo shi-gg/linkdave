@@ -32,14 +32,16 @@ type Server struct {
 	startTime    time.Time
 	draining     bool
 	drainMu      sync.RWMutex
+	version      string
 }
 
-func NewServer(logger *slog.Logger, voiceManager *voice.Manager) *Server {
+func NewServer(logger *slog.Logger, voiceManager *voice.Manager, version string) *Server {
 	s := &Server{
 		logger:       logger,
 		voiceManager: voiceManager,
 		clients:      make(map[string]*Client),
 		startTime:    time.Now(),
+		version:      version,
 	}
 	voiceManager.SetEventHandler(s)
 	s.startTickers()

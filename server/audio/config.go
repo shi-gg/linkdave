@@ -25,8 +25,11 @@ func init() {
 		PrivateIPAddressEnabled: getEnvBool("LINKDAVE_SOURCE_IP_ADDRESS_PRIVATE_ENABLED", false),
 		TextToSpeechEnabled:     getEnvBool("LINKDAVE_SOURCE_TEXT_TO_SPEECH_ENABLED", false),
 		TextToSpeechURL:         getEnvString("LINKDAVE_SOURCE_TEXT_TO_SPEECH_URL", "https://tts.wamellow.com/api/invoke"),
-		UserAgent:               "Linkdave/" + os.Getenv("VERSION"),
 	}
+}
+
+func SetVersion(v string) {
+	config.UserAgent = "Linkdave/" + v
 }
 
 func GetConfig() SourceConfig {
