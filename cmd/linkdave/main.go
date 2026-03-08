@@ -19,7 +19,10 @@ const (
 	DRAIN_TIMEOUT_SEC = 30 // Time to wait for players to migrate before force shutdown
 )
 
-var version = ""
+var (
+	version  = ""
+	password = os.Getenv("LINKDAVE_PASSWORD")
+)
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -33,7 +36,7 @@ func main() {
 
 	audio.SetVersion(version)
 	voiceManager := voice.NewManager(logger)
-	server := server.NewServer(logger, voiceManager, version)
+	server := server.NewServer(logger, voiceManager, version, password)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", server.HandleWebSocket)

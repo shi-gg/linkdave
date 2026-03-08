@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events } from "discord.js";
+import { Client, Events, GatewayIntentBits } from "discord.js";
 import { constructUri, EventName, LinkDaveClient } from "linkdave";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN!;
@@ -19,8 +19,7 @@ const discord = new Client({
 const linkdave = new LinkDaveClient({
     token: DISCORD_TOKEN,
     nodes: [
-        { name: "main", url: "ws://localhost:18080" },
-        // { name: "sec", url: "ws://localhost:18090" }
+        { name: "main", url: "ws://localhost:18080", password: process.env.LINKDAVE_PASSWORD }
     ],
     sendToShard: (guildId, payload) => {
         discord.guilds.cache.get(guildId)?.shard.send(payload);
@@ -49,7 +48,7 @@ discord.on(Events.MessageCreate, async (msg) => {
     if (cmd === "!join") {
         const vc = (await msg.member?.fetch())?.voice.channel;
         if (!vc) {
-            msg.reply("Join a voice channel first!");
+            void msg.reply("Join a voice channel first!");
             return;
         }
 

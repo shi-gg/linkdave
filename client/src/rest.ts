@@ -3,11 +3,17 @@ import { unwrap } from "./utils.js";
 
 export class RESTClient {
     readonly #baseUrl: string;
+    readonly #password: string | undefined;
 
-    constructor(wsUrl: string) {
+    constructor(
+        wsUrl: string,
+        password?: string
+    ) {
         const url = new URL(wsUrl);
         url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+
         this.#baseUrl = url.origin;
+        this.#password = password;
     }
 
     async put(route: string, body?: unknown): Promise<void> {
@@ -27,16 +33,24 @@ export class RESTClient {
     }
 
     async #request(method: string, route: string, body?: unknown): Promise<void> {
-        const url = `${this.#baseUrl}${route}`;
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json"
+        };
+
+        if (this.#password) {
+            headers.Authorization = `Bearer ${this.#password}`;
+        }
+
         const init: RequestInit = {
             method,
-            headers: { "Content-Type": "application/json" }
+            headers
         };
 
         if (body !== undefined) {
             init.body = JSON.stringify(body);
         }
 
+        const url = `${this.#baseUrl}${route}`;
         const res = await fetch(url, init);
 
         if (!res.ok) {

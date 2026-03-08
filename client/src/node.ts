@@ -20,6 +20,7 @@ import { unwrap } from "./utils.js";
 export interface NodeOptions {
     name: string;
     url: string;
+    password?: string;
     autoReconnect?: boolean;
     reconnectDelay?: number;
     maxReconnectAttempts?: number;
@@ -47,7 +48,7 @@ export class Node extends EventEmitter {
     readonly name: string;
     readonly url: string;
     readonly rest: RESTClient;
-    readonly #options: Required<Omit<NodeOptions, "name" | "url">>;
+    readonly #options: Required<Omit<NodeOptions, "name" | "url" | "password">> & { password: string | undefined; };
 
     #ws: WebSocket | null = null;
     #sessionId: string | null = null;
@@ -61,11 +62,12 @@ export class Node extends EventEmitter {
         super();
         this.name = options.name;
         this.url = options.url;
-        this.rest = new RESTClient(options.url);
+        this.rest = new RESTClient(options.url, options.password);
         this.#options = {
             autoReconnect: options.autoReconnect ?? true,
             reconnectDelay: options.reconnectDelay ?? 5_000,
-            maxReconnectAttempts: options.maxReconnectAttempts ?? 10
+            maxReconnectAttempts: options.maxReconnectAttempts ?? 10,
+            password: options.password
         };
     }
 
@@ -78,12 +80,14 @@ export class Node extends EventEmitter {
             }
 
             const url = new URL(this.url);
-            // Ensure we connect to the /ws endpoint
+            url.searchParams.set("node", this.name);
             if (!url.pathname || url.pathname === "/") {
                 url.pathname = "/ws";
             }
-            url.searchParams.set("node", this.name);
 
+            if (this.#options.password) {
+                url.searchParams.set("password", this.#options.password);
+            }
             this.#ws = new WebSocket(url.toString());
 
             const onOpen = () => {

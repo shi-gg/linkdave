@@ -31,6 +31,11 @@ type sessionHandler func(client *Client, guildID snowflake.ID, w http.ResponseWr
 
 func (s *Server) withSession(next sessionHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if s.password != "" && r.Header.Get("Authorization") != "Bearer "+s.password {
+			writeJSON(w, http.StatusUnauthorized, protocol.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
 		sessionID := r.PathValue("session_id")
 		guildIDStr := r.PathValue("guild_id")
 

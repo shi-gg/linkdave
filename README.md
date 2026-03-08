@@ -34,7 +34,7 @@ To deploy Linkdave using Docker, you can use the following `compose.yml` configu
 services:
     linkdave:
         image: ghcr.io/shi-gg/linkdave:latest
-        container_name: radio-linkdave
+        container_name: linkdave
         restart: unless-stopped
         ports:
             - "8080:8080"
@@ -50,8 +50,16 @@ services:
                 max-size: "10m"
                 max-file: "3"
         environment:
+            LINKDAVE_PASSWORD: ${LINKDAVE_PASSWORD}
             LINKDAVE_SOURCE_HTTPS_ENABLED: true
             LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED: true
+```
+
+To generate a random password, you can use the following command in your terminal:
+
+```bash
+echo "LINKDAVE_PASSWORD=$(openssl rand -hex 16)" >> .env
+cat .env
 ```
 
 To start the server, run:

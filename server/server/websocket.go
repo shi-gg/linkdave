@@ -33,15 +33,17 @@ type Server struct {
 	draining     bool
 	drainMu      sync.RWMutex
 	version      string
+	password     string
 }
 
-func NewServer(logger *slog.Logger, voiceManager *voice.Manager, version string) *Server {
+func NewServer(logger *slog.Logger, voiceManager *voice.Manager, version string, password string) *Server {
 	s := &Server{
 		logger:       logger,
 		voiceManager: voiceManager,
 		clients:      make(map[string]*Client),
 		startTime:    time.Now(),
 		version:      version,
+		password:     password,
 	}
 	voiceManager.SetEventHandler(s)
 	s.startTickers()
@@ -137,6 +139,11 @@ func (s *Server) OnVoiceDisconnected(sessionID string, guildID snowflake.ID) {
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if s.IsDraining() {
 		http.Error(w, "Node is draining", http.StatusServiceUnavailable)
+		return
+	}
+
+	if s.password != "" && r.URL.Query().Get("password") != s.password {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
