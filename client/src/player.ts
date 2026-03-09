@@ -8,6 +8,7 @@ import type {
     PlayerUpdatePayload,
     TrackEndPayload,
     TrackInfo,
+    TrackStartPayload,
     VoiceConnectPayload,
     VoiceServerEvent
 } from "./types.js";
@@ -318,7 +319,12 @@ export class Player {
         this.#volume = data.volume;
     }
 
+    _onTrackStart(data: TrackStartPayload) {
+        this.#current = data.track;
+    }
+
     _onTrackEnd(data: TrackEndPayload) {
+        this.#current = null;
         this.#state = PlayerState.Idle;
         this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped);
     }
