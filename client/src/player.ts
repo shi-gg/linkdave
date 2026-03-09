@@ -2,14 +2,16 @@ import { GatewayOpcodes, type GatewayVoiceServerUpdateDispatchData, type Gateway
 
 import type { LinkDaveClient } from "./client.js";
 import type { Node } from "./node.js";
+import { Queue } from "./queue.js";
 import type {
     MigrateReadyPayload,
     PlayerUpdatePayload,
+    TrackEndPayload,
     TrackInfo,
     VoiceConnectPayload,
     VoiceServerEvent
 } from "./types.js";
-import { EventName, PlayerState } from "./types.js";
+import { EventName, PlayerState, TrackEndReason } from "./types.js";
 import { unwrap } from "./utils.js";
 
 export interface PlayOptions {
@@ -43,6 +45,7 @@ export class Player {
 
     readonly #client: LinkDaveClient;
     readonly #guildId: string;
+    readonly #queue: Queue;
     #node: Node;
 
     #voiceChannelId: string | null = null;
@@ -51,7 +54,7 @@ export class Player {
     #state: PlayerState = PlayerState.Idle;
     #position = 0;
     #volume = 100;
-    #currentTrack: TrackInfo | null = null;
+    #current: TrackInfo | null = null;
     #voiceState: VoiceState | null = null;
     #pendingVoice: PendingVoiceState | null = null;
     #migrationTarget: Node | null = null;
@@ -61,6 +64,7 @@ export class Player {
         this.#client = client;
         this.#guildId = guildId;
         this.#node = node;
+        this.#queue = new Queue(this);
         this.#voiceChannelId = options?.voiceChannelId ?? null;
         this.#selfMute = options?.selfMute ?? false;
         this.#selfDeaf = options?.selfDeaf ?? true;
@@ -86,12 +90,16 @@ export class Player {
         return this.#volume;
     }
 
-    get currentTrack() {
-        return this.#currentTrack;
+    get current() {
+        return this.#current;
     }
 
     get node() {
         return this.#node;
+    }
+
+    get queue() {
+        return this.#queue;
     }
 
     get playing() {
@@ -145,6 +153,8 @@ export class Player {
     }
 
     disconnect() {
+        this.#queue._deactivate();
+
         this.#client._sendToShard(this.#guildId, {
             op: GatewayOpcodes.VoiceStateUpdate,
             d: {
@@ -157,7 +167,7 @@ export class Player {
 
         this.#voiceChannelId = null;
         this.#state = PlayerState.Idle;
-        this.#currentTrack = null;
+        this.#current = null;
         this.#position = 0;
         this.#voiceState = null;
         this.#pendingVoice = null;
@@ -239,7 +249,12 @@ export class Player {
         });
     }
 
-    async play(url: string, options: PlayOptions = {}) {
+    async play(url: string, options: PlayOptions = {}, isFromQueue = false) {
+        if (!isFromQueue) this.#queue._deactivate();
+        await this.#sendPlay(url, options);
+    }
+
+    async #sendPlay(url: string, options: PlayOptions = {}) {
         await this.#node.sendPlay(this.#guildId, {
             url,
             ...(options.startTime !== undefined && { start_time: options.startTime }),
@@ -256,8 +271,9 @@ export class Player {
     }
 
     async stop() {
+        this.#queue._deactivate();
         await this.#node.sendStop(this.#guildId);
-        this.#currentTrack = null;
+        this.#current = null;
         this.#state = PlayerState.Idle;
         this.#position = 0;
     }
@@ -300,6 +316,11 @@ export class Player {
         this.#state = data.state;
         this.#position = data.position;
         this.#volume = data.volume;
+    }
+
+    _onTrackEnd(data: TrackEndPayload) {
+        this.#state = PlayerState.Idle;
+        this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped);
     }
 
     _onMigrateReady(data: MigrateReadyPayload) {

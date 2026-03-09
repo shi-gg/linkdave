@@ -24,8 +24,7 @@ export enum TrackEndReason {
     Finished = "finished",
     Stopped = "stopped",
     Replaced = "replaced",
-    Error = "error",
-    Cleanup = "cleanup"
+    Error = "error"
 }
 
 export enum PlayerState {
