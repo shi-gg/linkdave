@@ -23,8 +23,6 @@ export class Queue {
     async skip() {
         if (!this.#active) return;
 
-        this.#tracks.shift();
-
         if (this.#tracks.length === 0) {
             this.#active = false;
             await this.#player.stop();
@@ -60,8 +58,6 @@ export class Queue {
     _onTrackEnd(finished: boolean) {
         if (!this.#active || !finished) return;
 
-        this.#tracks.shift();
-
         if (this.#tracks.length === 0) {
             this.#active = false;
             return;
@@ -75,7 +71,7 @@ export class Queue {
     }
 
     async #playCurrentTrack() {
-        const item = this.#tracks[0];
+        const item = this.#tracks.shift();
         if (!item) return;
 
         await this.#player.play(item, undefined, true);
