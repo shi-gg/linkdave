@@ -324,8 +324,10 @@ export class Player {
     }
 
     _onTrackEnd(data: TrackEndPayload) {
-        this.#current = null;
-        this.#state = PlayerState.Idle;
+        if (!this.#queue.active || this.#queue.size === 0) {
+            this.#current = null;
+            this.#state = PlayerState.Idle;
+        }
         this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped);
     }
 
