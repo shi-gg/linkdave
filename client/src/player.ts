@@ -315,6 +315,9 @@ export class Player {
     _onVoiceDisconnect() {
         this.#voiceState = null;
         this.#pendingVoice = null;
+        this.#state = PlayerState.Idle;
+        this.#currentTrack = null;
+        this.#position = 0;
     }
 
     _onMigrateReady(data: MigrateReadyPayload) {
