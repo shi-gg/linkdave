@@ -7,6 +7,7 @@ on:
 
 permissions:
     contents: read
+    packages: write
 
 jobs:
     test:
@@ -16,7 +17,7 @@ jobs:
         steps:
             - uses: actions/checkout@v6
             - name: Build Docker image
-              run: docker build --build-arg BUILD_VERSION=pr-${{ github.event.pull_request.number }} -t ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:pr-${{ github.event.pull_request.number }}  .
+              run: docker build --build-arg BUILD_VERSION=pr-${{ github.event.pull_request.number }} -t ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:pr-${{ github.event.pull_request.number }} .
 
             - name: Push Docker image
               if: github.actor == github.repository_owner
