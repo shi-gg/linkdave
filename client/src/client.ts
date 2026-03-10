@@ -10,7 +10,8 @@ import type {
     ManagerEvents,
     MigrateReadyPayload,
     NodeDrainingPayload,
-    PlayerUpdatePayload
+    PlayerUpdatePayload,
+    VoiceDisconnectPayload
 } from "./types.js";
 import {
     EventName,
@@ -197,7 +198,7 @@ export class LinkDaveClient extends EventEmitter {
         node.on(EventName.TrackEnd, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackEnd, data));
         node.on(EventName.TrackError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackError, data));
         node.on(EventName.VoiceConnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceConnect, data));
-        node.on(EventName.VoiceDisconnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceDisconnect, data));
+        node.on(EventName.VoiceDisconnect, (data) => this.#handleVoiceDisconnect(node, data));
 
         node.on(EventName.Pong, () => this.emit(EventName.Pong, undefined));
         node.on(EventName.Stats, (data) => this.emit(EventName.Stats, data));
@@ -227,6 +228,14 @@ export class LinkDaveClient extends EventEmitter {
 
         player._updateState(data);
         this.emit(EventName.PlayerUpdate, data);
+    }
+
+    #handleVoiceDisconnect(node: Node, data: VoiceDisconnectPayload) {
+        const player = this.#players.get(data.guild_id);
+        if (player?.node !== node) return;
+
+        player._onVoiceDisconnect();
+        this.emit(EventName.VoiceDisconnect, data);
     }
 
     async #handleNodeDraining(node: Node, data: NodeDrainingPayload) {
