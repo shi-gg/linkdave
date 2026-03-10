@@ -34,10 +34,10 @@ jobs:
               run: bun ./scripts/check-version.ts
 
             - name: Build Docker image
-              run: docker build --build-arg BUILD_VERSION=${{ env.version }} -t ${{ env.IMAGE_BASE }}:${{ GITHUB_SHA }} -t ${{ env.IMAGE_BASE }}:latest -t ${{ env.IMAGE_BASE }}:${{ env.version }} .
+              run: docker build --build-arg BUILD_VERSION=${{ env.version }} -t ${{ env.IMAGE_BASE }}:${{ github.sha }} -t ${{ env.IMAGE_BASE }}:latest -t ${{ env.IMAGE_BASE }}:${{ env.version }} .
 
             - name: Push Docker image
-              run: docker push ${{ env.IMAGE_BASE }}:${{ GITHUB_SHA }}
+              run: docker push ${{ env.IMAGE_BASE }}:${{ github.sha }}
 
             - name: Push Docker image (Release)
               if: env.publish == 'true'
