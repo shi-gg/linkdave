@@ -198,6 +198,7 @@ export class LinkDaveClient extends EventEmitter {
         node.on(EventName.TrackStart, (data) => this.#handleTrackStart(node, data));
         node.on(EventName.TrackEnd, (data) => this.#handleTrackEnd(node, data));
         node.on(EventName.TrackError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackError, data));
+        node.on(EventName.QueueError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.QueueError, data));
         node.on(EventName.VoiceConnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceConnect, data));
         node.on(EventName.VoiceDisconnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceDisconnect, data));
 

@@ -1,4 +1,5 @@
 import type { Player } from "./player.js";
+import { EventName, type QueueErrorPayload } from "./types.js";
 
 export class Queue {
     readonly #player: Player;
@@ -63,7 +64,20 @@ export class Queue {
             return;
         }
 
-        void this.#playCurrentTrack();
+        const item = this.#tracks.shift();
+        if (!item) return;
+
+        this.#player
+            .play(item, undefined, true)
+            .then(
+                () => null,
+                (error_: unknown) => {
+                    const error = error_ instanceof Error ? error_ : new Error(String(error_));
+                    const payload: QueueErrorPayload = { guild_id: this.#player.guildId, url: item, error };
+                    this.#player.node.emit(EventName.QueueError, payload);
+                    this._onTrackEnd(true);
+                }
+            );
     }
 
     _deactivate() {

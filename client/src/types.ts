@@ -118,6 +118,12 @@ export interface TrackErrorPayload {
     error: string;
 }
 
+export interface QueueErrorPayload {
+    guild_id: string;
+    url: string;
+    error: Error;
+}
+
 export interface VoiceConnectPayload {
     guild_id: string;
     channel_id: string;
@@ -164,6 +170,7 @@ export enum EventName {
     TrackStart = "trackStart",
     TrackEnd = "trackEnd",
     TrackError = "trackError",
+    QueueError = "queueError",
     VoiceConnect = "voiceConnect",
     VoiceDisconnect = "voiceDisconnect",
 
@@ -183,6 +190,7 @@ export interface Events {
     [EventName.TrackStart]: TrackStartPayload;
     [EventName.TrackEnd]: TrackEndPayload;
     [EventName.TrackError]: TrackErrorPayload;
+    [EventName.QueueError]: QueueErrorPayload;
     [EventName.VoiceConnect]: VoiceConnectPayload;
     [EventName.VoiceDisconnect]: VoiceDisconnectPayload;
     [EventName.Pong]: undefined;
