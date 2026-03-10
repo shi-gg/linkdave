@@ -13,6 +13,8 @@ jobs:
     build:
         name: Publish GHCR
         runs-on: ubuntu-latest
+        env:
+            IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
 
         steps:
             - uses: actions/checkout@v6
@@ -32,10 +34,13 @@ jobs:
               run: bun ./scripts/check-version.ts
 
             - name: Build Docker image
-              run: docker build --build-arg BUILD_VERSION=${{ env.version }} -t ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest -t ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ env.version }} .
+              run: docker build --build-arg BUILD_VERSION=${{ env.version }} -t ${{ env.IMAGE_BASE }}:${{ GITHUB_SHA }} -t ${{ env.IMAGE_BASE }}:latest -t ${{ env.IMAGE_BASE }}:${{ env.version }} .
 
             - name: Push Docker image
+              run: docker push ${{ env.IMAGE_BASE }}:${{ GITHUB_SHA }}
+
+            - name: Push Docker image (Release)
               if: env.publish == 'true'
               run: |
-                  docker push ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
-                  docker push ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ env.version }}
+                  docker push ${{ env.IMAGE_BASE }}:latest
+                  docker push ${{ env.IMAGE_BASE }}:${{ env.version }}
