@@ -58,6 +58,7 @@ export class Player {
     #current: TrackInfo | null = null;
     #voiceState: VoiceState | null = null;
     #pendingVoice: PendingVoiceState | null = null;
+    #lastServerEvent: VoiceServerEvent | null = null;
     #migrationTarget: Node | null = null;
     #migrationResolve: ((value: unknown) => void) | null = null;
 
@@ -172,6 +173,7 @@ export class Player {
         this.#position = 0;
         this.#voiceState = null;
         this.#pendingVoice = null;
+        this.#lastServerEvent = null;
     }
 
     async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
@@ -179,6 +181,7 @@ export class Player {
             this.#voiceChannelId = null;
             this.#voiceState = null;
             this.#pendingVoice = null;
+            this.#lastServerEvent = null;
 
             if (this.#node.connected) {
                 await unwrap(this.#node.sendDisconnect(this.#guildId));
@@ -190,6 +193,12 @@ export class Player {
         this.#pendingVoice ??= {};
         this.#pendingVoice.channelId = data.channel_id;
         this.#pendingVoice.sessionId = data.session_id;
+
+        // If we already have a server event from a previous connection to the same
+        // channel and no new VOICE_SERVER_UPDATE has been received yet, re-use it.
+        if (!this.#pendingVoice.serverEvent && this.#lastServerEvent) {
+            this.#pendingVoice.serverEvent = this.#lastServerEvent;
+        }
 
         this.#tryConnectLinkDave();
     }
@@ -240,6 +249,7 @@ export class Player {
     #connectToLinkDave(channelId: string, sessionId: string, event: VoiceServerEvent) {
         this.#voiceChannelId = channelId;
         this.#voiceState = { channelId, sessionId, event };
+        this.#lastServerEvent = event;
 
         this.#node.sendVoiceUpdate({
             client_id: this.#client.clientId,
@@ -329,6 +339,14 @@ export class Player {
             this.#state = PlayerState.Idle;
         }
         this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped);
+    }
+
+    _onVoiceDisconnect() {
+        this.#voiceState = null;
+        this.#pendingVoice = null;
+        this.#state = PlayerState.Idle;
+        this.#current = null;
+        this.#position = 0;
     }
 
     _onMigrateReady(data: MigrateReadyPayload) {
