@@ -32,11 +32,19 @@ jobs:
               working-directory: ./client
 
             - uses: actions/setup-node@v6
-              if: env.publish == 'true'
               with:
                   node-version: "latest"
                   registry-url: "https://registry.npmjs.org"
 
-            - run: npm publish --provenance --access public
+            - name: Publish NPM
+              if: env.publish != 'true'
+              run: |
+                  SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+                  npm version "${{ env.version }}-dev.${SHORT_SHA}" --no-git-tag-version
+                  npm publish --provenance --access public --tag dev
+              working-directory: ./client
+
+            - name: Publish NPM (Release)
               if: env.publish == 'true'
+              run: npm publish --provenance --access public
               working-directory: ./client
