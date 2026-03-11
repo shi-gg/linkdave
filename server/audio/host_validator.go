@@ -54,7 +54,7 @@ func ValidateHost(urlStr string) (string, error) {
 		ip = ips[0]
 	}
 
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
 		if !config.PrivateIPAddressEnabled {
 			return "", fmt.Errorf("private IP address not allowed")
 		}
