@@ -61,9 +61,6 @@ discord.on(Events.MessageCreate, async (msg) => {
 
     const player = linkdave.players.get(msg.guild.id);
     if (!player) return;
-    console.log("active", player.queue.active)
-    console.log("playing", player.playing)
-    console.log("\n")
 
     switch (cmd) {
         case "!play":
