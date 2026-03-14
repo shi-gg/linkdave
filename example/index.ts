@@ -29,6 +29,7 @@ const linkdave = new LinkDaveClient({
 discord.on(Events.Raw, (packet) => linkdave.handleRaw(packet));
 
 linkdave.on(EventName.Ready, (d) => console.log(`LinkDave session: ${d.session_id}`));
+linkdave.on(EventName.PlayerUpdate, (d) => console.log(`Update: ${d.state}`));
 linkdave.on(EventName.TrackStart, (d) => console.log(`Playing: ${d.track.url}`));
 linkdave.on(EventName.TrackEnd, (d) => console.log(`Track ended: ${d.reason}`));
 linkdave.on(EventName.TrackError, (d) => console.error(`Error: ${d.error}`));
@@ -62,8 +63,20 @@ discord.on(Events.MessageCreate, async (msg) => {
     if (!player) return;
 
     switch (cmd) {
-        case "!play": await player.play(args[0]); break;
-        case "!tts": await player.play(constructUri.tts(args.join(" "), "en_us_001")); break;
+        case "!play":
+            player.queue.add(args[0]);
+            if (!player.playing) await player.queue.start();
+            break;
+        case "!tts":
+            player.queue.add(constructUri.tts(args.join(" "), "en_us_001"));
+            if (!player.playing) await player.queue.start();
+            break;
+        case "!skip": await player.queue.skip(); break;
+        case "!clear": {
+            player.queue.clear();
+            void msg.reply("Queue cleared");
+            break;
+        }
         case "!pause": await player.pause(); break;
         case "!resume": await player.resume(); break;
         case "!stop": await player.stop(); break;

@@ -25,7 +25,6 @@ const (
 	TrackEndReasonStopped  = "stopped"
 	TrackEndReasonReplaced = "replaced"
 	TrackEndReasonError    = "error"
-	TrackEndReasonCleanup  = "cleanup"
 )
 
 const (

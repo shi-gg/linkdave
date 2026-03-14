@@ -11,6 +11,8 @@ import type {
     MigrateReadyPayload,
     NodeDrainingPayload,
     PlayerUpdatePayload,
+    TrackEndPayload,
+    TrackStartPayload,
     VoiceDisconnectPayload
 } from "./types.js";
 import {
@@ -194,9 +196,10 @@ export class LinkDaveClient extends EventEmitter {
         node.on(EventName.Ready, (data) => this.emit(EventName.Ready, data));
         node.on(EventName.PlayerUpdate, (data) => this.#handlePlayerUpdate(node, data));
 
-        node.on(EventName.TrackStart, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackStart, data));
-        node.on(EventName.TrackEnd, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackEnd, data));
+        node.on(EventName.TrackStart, (data) => this.#handleTrackStart(node, data));
+        node.on(EventName.TrackEnd, (data) => this.#handleTrackEnd(node, data));
         node.on(EventName.TrackError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackError, data));
+        node.on(EventName.QueueError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.QueueError, data));
         node.on(EventName.VoiceConnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceConnect, data));
         node.on(EventName.VoiceDisconnect, (data) => this.#handleVoiceDisconnect(node, data));
 
@@ -228,6 +231,22 @@ export class LinkDaveClient extends EventEmitter {
 
         player._updateState(data);
         this.emit(EventName.PlayerUpdate, data);
+    }
+
+    #handleTrackStart(node: Node, data: TrackStartPayload) {
+        const player = this.#players.get(data.guild_id);
+        if (player?.node !== node) return;
+
+        player._onTrackStart(data);
+        this.emit(EventName.TrackStart, data);
+    }
+
+    #handleTrackEnd(node: Node, data: TrackEndPayload) {
+        const player = this.#players.get(data.guild_id);
+        if (player?.node !== node) return;
+
+        player._onTrackEnd(data);
+        this.emit(EventName.TrackEnd, data);
     }
 
     #handleVoiceDisconnect(node: Node, data: VoiceDisconnectPayload) {
