@@ -7,6 +7,7 @@ import type {
     PlayerUpdatePayload,
     TrackInfo,
     VoiceConnectPayload,
+    VoiceDisconnectPayload,
     VoiceServerEvent
 } from "./types.js";
 import { EventName, PlayerState } from "./types.js";
@@ -126,9 +127,17 @@ export class Player {
         });
 
         return new Promise<VoiceConnectPayload>((resolve, reject) => {
+            const cleanup = () => {
+                this.#node.off(EventName.VoiceConnect, onConnect);
+                this.#node.off(EventName.VoiceDisconnect, onDisconnect);
+                clearTimeout(timer);
+            };
+
             const timer = setTimeout(
                 () => {
-                    this.#node.off(EventName.VoiceConnect, onConnect);
+                    cleanup();
+                    this.#pendingVoice = null;
+                    this.#lastServerEvent = null;
                     reject(new Error(`Voice connection timed out for guild "${this.#guildId}"`));
                 },
                 timeoutMs
@@ -136,12 +145,18 @@ export class Player {
 
             const onConnect = (event: VoiceConnectPayload) => {
                 if (event.guild_id !== this.#guildId) return;
-                this.#node.off(EventName.VoiceConnect, onConnect);
-                clearTimeout(timer);
+                cleanup();
                 resolve(event);
             };
 
+            const onDisconnect = (event: VoiceDisconnectPayload) => {
+                if (event.guild_id !== this.#guildId) return;
+                cleanup();
+                reject(new Error(`Voice connection failed for guild "${this.#guildId}": ${event.reason ?? "unknown"}`));
+            };
+
             this.#node.on(EventName.VoiceConnect, onConnect);
+            this.#node.on(EventName.VoiceDisconnect, onDisconnect);
         });
     }
 
@@ -165,7 +180,7 @@ export class Player {
         this.#lastServerEvent = null;
     }
 
-    async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
+    handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
         if (!data.channel_id) {
             this.#voiceChannelId = null;
             this.#voiceState = null;
@@ -173,7 +188,7 @@ export class Player {
             this.#lastServerEvent = null;
 
             if (this.#node.connected) {
-                await unwrap(this.#node.sendDisconnect(this.#guildId));
+                void unwrap(this.#node.sendDisconnect(this.#guildId));
             }
 
             return;
@@ -195,16 +210,20 @@ export class Player {
     // A null endpoint means that the voice server allocated has gone away and is trying to be reallocated.
     // You should attempt to disconnect from the currently connected voice server,
     // and not attempt to reconnect until a new voice server is allocated.
-    async handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
+    handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
         if (!data.endpoint) {
+            const hadVoiceState = this.#voiceState !== null;
             this.#voiceState = null;
 
             if (this.#pendingVoice) {
                 delete this.#pendingVoice.serverEvent;
             }
 
-            if (this.#node.connected) {
-                await unwrap(this.#node.sendDisconnect(this.#guildId));
+            // Only send disconnect if we had an active voice state to tear down.
+            // Fire-and-forget: don't await, so a subsequent valid VOICE_SERVER_UPDATE
+            // isn't delayed by the HTTP round-trip.
+            if (hadVoiceState && this.#node.connected) {
+                void unwrap(this.#node.sendDisconnect(this.#guildId));
             }
 
             return;
