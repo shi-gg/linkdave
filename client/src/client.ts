@@ -169,7 +169,7 @@ export class LinkDaveClient extends EventEmitter {
                 if (data.user_id !== this.#clientId) return;
 
                 const player = this.#players.get(data.guild_id);
-                player?.handleVoiceStateUpdate({
+                void player?.handleVoiceStateUpdate({
                     user_id: data.user_id,
                     channel_id: data.channel_id,
                     session_id: data.session_id
@@ -179,7 +179,7 @@ export class LinkDaveClient extends EventEmitter {
             }
             case GatewayDispatchEvents.VoiceServerUpdate: {
                 const player = this.#players.get(data.guild_id);
-                player?.handleVoiceServerUpdate(data);
+                void player?.handleVoiceServerUpdate(data);
 
                 break;
             }

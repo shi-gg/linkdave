@@ -180,7 +180,7 @@ export class Player {
         this.#lastServerEvent = null;
     }
 
-    handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
+    async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
         if (!data.channel_id) {
             this.#voiceChannelId = null;
             this.#voiceState = null;
@@ -188,7 +188,8 @@ export class Player {
             this.#lastServerEvent = null;
 
             if (this.#node.connected) {
-                void unwrap(this.#node.sendDisconnect(this.#guildId));
+                const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
+                if (err) this.#node.emit(EventName.Error, err as Error);
             }
 
             return;
@@ -210,7 +211,7 @@ export class Player {
     // A null endpoint means that the voice server allocated has gone away and is trying to be reallocated.
     // You should attempt to disconnect from the currently connected voice server,
     // and not attempt to reconnect until a new voice server is allocated.
-    handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
+    async handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
         if (!data.endpoint) {
             const hadVoiceState = this.#voiceState !== null;
             this.#voiceState = null;
@@ -223,7 +224,8 @@ export class Player {
             // Fire-and-forget: don't await, so a subsequent valid VOICE_SERVER_UPDATE
             // isn't delayed by the HTTP round-trip.
             if (hadVoiceState && this.#node.connected) {
-                void unwrap(this.#node.sendDisconnect(this.#guildId));
+                const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
+                if (err) this.#node.emit(EventName.Error, err as Error);
             }
 
             return;
