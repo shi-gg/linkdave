@@ -177,7 +177,7 @@ func (m *Manager) Position(sessionID string, guildID snowflake.ID) int64 {
 	return conn.Position()
 }
 
-func (m *Manager) Disconnect(sessionID string, guildID snowflake.ID) error {
+func (m *Manager) Disconnect(sessionID string, guildID snowflake.ID) bool {
 	key := connectionKey(sessionID, guildID)
 
 	m.mutex.Lock()
@@ -185,7 +185,7 @@ func (m *Manager) Disconnect(sessionID string, guildID snowflake.ID) error {
 	conn, ok := m.connections[key]
 	if !ok {
 		m.mutex.Unlock()
-		return nil
+		return false
 	}
 
 	delete(m.connections, key)
@@ -200,7 +200,7 @@ func (m *Manager) Disconnect(sessionID string, guildID snowflake.ID) error {
 		)
 	}()
 
-	return nil
+	return true
 }
 
 func (m *Manager) Close() {
