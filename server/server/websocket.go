@@ -238,16 +238,12 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 		slog.String("channel_id", update.ChannelID.String()),
 	)
 
-	player := client.getOrCreatePlayer(update.GuildID)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	err := s.voiceManager.Connect(ctx, client.sessionID, update.ClientID, update.GuildID, update.ChannelID, update.SessionID, update.Event)
 	if err != nil {
 		s.logger.Error("failed to connect to voice", slog.Any("error", err))
-
-		client.removePlayer(update.GuildID)
 
 		client.send(protocol.Message{
 			Op: protocol.OpVoiceDisconnect,
@@ -260,6 +256,7 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 		return
 	}
 
+	player := client.getOrCreatePlayer(update.GuildID)
 	player.SetChannelID(update.ChannelID)
 
 	client.send(protocol.Message{
