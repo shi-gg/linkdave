@@ -59,9 +59,11 @@ func (m *Manager) onTrackEnd(sessionID string, guildID snowflake.ID, source audi
 
 func (m *Manager) onDisconnect(sessionID string, guildID snowflake.ID, conn *Connection, key string) {
 	m.mutex.Lock()
-	if m.connections[key] == conn {
-		delete(m.connections, key)
+	if m.connections[key] != conn {
+		m.mutex.Unlock()
+		return
 	}
+	delete(m.connections, key)
 	handler := m.eventHandler
 	m.mutex.Unlock()
 
