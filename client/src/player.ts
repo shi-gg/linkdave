@@ -321,7 +321,7 @@ export class Player {
             await unwrap(this.#node.sendDisconnect(this.#guildId));
         }
 
-        this.#client.removePlayer(this.#guildId);
+        this.#client._onPlayerDestroy(this.#guildId);
     }
 
     async moveNode(targetNode: Node) {
