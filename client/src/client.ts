@@ -263,7 +263,6 @@ export class LinkDaveClient extends EventEmitter {
         const player = this.#players.get(guildId);
         if (!player) return;
 
-        this.emit(EventName.VoiceDisconnect, { guild_id: guildId, reason: "destroyed" });
         player.node.decrementPlayerCount();
         this.#players.delete(guildId);
     }
