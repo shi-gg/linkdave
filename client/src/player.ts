@@ -317,11 +317,39 @@ export class Player {
     async destroy() {
         this.disconnect();
 
-        if (this.#node.connected) {
-            await unwrap(this.#node.sendDisconnect(this.#guildId));
+        if (!this.#node.connected) {
+            this.#client._onPlayerDestroy(this.#guildId);
+            return;
         }
 
-        this.#client.removePlayer(this.#guildId);
+        const waitForVoiceDisconnect = this.#waitForNodeVoiceDisconnect(Player.CONNECT_TIMEOUT);
+        await unwrap(this.#node.sendDisconnect(this.#guildId));
+
+        if (!(await waitForVoiceDisconnect)) {
+            this.#client._onPlayerDestroy(this.#guildId);
+        }
+    }
+
+    #waitForNodeVoiceDisconnect(timeoutMs: number) {
+        return new Promise<boolean>((resolve) => {
+            const cleanup = () => {
+                this.#node.off(EventName.VoiceDisconnect, onDisconnect);
+                clearTimeout(timeout);
+            };
+
+            const onDisconnect = (data: VoiceDisconnectPayload) => {
+                if (data.guild_id !== this.#guildId) return;
+                cleanup();
+                resolve(true);
+            };
+
+            const timeout = setTimeout(() => {
+                cleanup();
+                resolve(false);
+            }, timeoutMs);
+
+            this.#node.on(EventName.VoiceDisconnect, onDisconnect);
+        });
     }
 
     async moveNode(targetNode: Node) {

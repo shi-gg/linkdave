@@ -255,6 +255,16 @@ export class LinkDaveClient extends EventEmitter {
 
         player._onVoiceDisconnect();
         this.emit(EventName.VoiceDisconnect, data);
+        player.node.decrementPlayerCount();
+        this.#players.delete(data.guild_id);
+    }
+
+    _onPlayerDestroy(guildId: string) {
+        const player = this.#players.get(guildId);
+        if (!player) return;
+
+        player.node.decrementPlayerCount();
+        this.#players.delete(guildId);
     }
 
     async #handleNodeDraining(node: Node, data: NodeDrainingPayload) {
