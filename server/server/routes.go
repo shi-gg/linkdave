@@ -300,17 +300,16 @@ func (s *Server) routeVolume(client *Client, guildID snowflake.ID, w http.Respon
 func (s *Server) routeDisconnect(client *Client, guildID snowflake.ID, w http.ResponseWriter, _ *http.Request) {
 	s.logger.Info("processing disconnect", slog.String("guild_id", guildID.String()))
 
-	if s.voiceManager.Disconnect(client.sessionID, guildID) {
-		client.removePlayer(guildID)
+	s.voiceManager.Disconnect(client.sessionID, guildID)
+	client.removePlayer(guildID)
 
-		client.send(protocol.Message{
-			Op: protocol.OpVoiceDisconnect,
-			Data: protocol.VoiceDisconnectData{
-				GuildID: guildID,
-				Reason:  "requested",
-			},
-		})
-	}
+	client.send(protocol.Message{
+		Op: protocol.OpVoiceDisconnect,
+		Data: protocol.VoiceDisconnectData{
+			GuildID: guildID,
+			Reason:  "requested",
+		},
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
