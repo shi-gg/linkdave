@@ -1,10 +1,10 @@
 {
     "compilerOptions": {
-        "target": "ES2024",
+        "target": "ESNext",
         "module": "NodeNext",
         "moduleResolution": "NodeNext",
         "lib": [
-            "ES2024"
+            "ESNext"
         ],
         "outDir": "./dist",
         "rootDir": "./src",
@@ -21,7 +21,10 @@
         "noImplicitReturns": true,
         "noFallthroughCasesInSwitch": true,
         "exactOptionalPropertyTypes": true,
-        "noUncheckedIndexedAccess": true
+        "noUncheckedIndexedAccess": true,
+        "types": [
+            "node"
+        ]
     },
     "include": [
         "src/**/*"
