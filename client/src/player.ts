@@ -210,10 +210,7 @@ export class Player {
         this.#pendingVoice.channelId = data.channel_id;
         this.#pendingVoice.sessionId = data.session_id;
 
-        // If we already have a server event from a previous connection to the same
-        // channel and no new VOICE_SERVER_UPDATE has been received yet, re-use it.
-        const isSameChannelReconnect = this.#voiceState?.channelId === data.channel_id;
-        if (!this.#pendingVoice.serverEvent && this.#lastServerEvent && isSameChannelReconnect) {
+        if (!this.#pendingVoice.serverEvent && this.#lastServerEvent && this.#voiceState?.channelId === data.channel_id) {
             this.#pendingVoice.serverEvent = this.#lastServerEvent;
         }
 
