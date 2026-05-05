@@ -59,7 +59,6 @@ export class Player {
     #current: TrackInfo | null = null;
     #voiceState: VoiceState | null = null;
     #pendingVoice: PendingVoiceState | null = null;
-    #lastServerEvent: VoiceServerEvent | null = null;
     #migrationTarget: Node | null = null;
     #migrationResolve: ((value: unknown) => void) | null = null;
 
@@ -146,7 +145,6 @@ export class Player {
                 () => {
                     cleanup();
                     this.#pendingVoice = null;
-                    this.#lastServerEvent = null;
                     reject(new Error(`Voice connection timed out for guild "${this.#guildId}"`));
                 },
                 timeoutMs
@@ -188,7 +186,6 @@ export class Player {
         this.#position = 0;
         this.#voiceState = null;
         this.#pendingVoice = null;
-        this.#lastServerEvent = null;
     }
 
     async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
@@ -196,7 +193,6 @@ export class Player {
             this.#voiceChannelId = null;
             this.#voiceState = null;
             this.#pendingVoice = null;
-            this.#lastServerEvent = null;
 
             if (this.#node.connected) {
                 const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
@@ -209,10 +205,6 @@ export class Player {
         this.#pendingVoice ??= {};
         this.#pendingVoice.channelId = data.channel_id;
         this.#pendingVoice.sessionId = data.session_id;
-
-        if (!this.#pendingVoice.serverEvent && this.#lastServerEvent && this.#voiceState?.channelId === data.channel_id) {
-            this.#pendingVoice.serverEvent = this.#lastServerEvent;
-        }
 
         this.#tryConnectLinkDave();
     }
@@ -263,7 +255,6 @@ export class Player {
     #connectToLinkDave(channelId: string, sessionId: string, event: VoiceServerEvent) {
         this.#voiceChannelId = channelId;
         this.#voiceState = { channelId, sessionId, event };
-        this.#lastServerEvent = event;
 
         this.#node.sendVoiceUpdate({
             client_id: this.#client.clientId,
