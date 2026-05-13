@@ -375,6 +375,8 @@ export class Player {
     }
 
     _onVoiceDisconnect() {
+        this.#voiceChannelId = null;
+        this.#queue._deactivate();
         this.#voiceState = null;
         this.#pendingVoice = null;
         this.#state = PlayerState.Idle;
