@@ -312,7 +312,6 @@ export class Player {
         }
 
         const waitForVoiceDisconnect = this.#waitForNodeVoiceDisconnect(Player.CONNECT_TIMEOUT);
-        await unwrap(this.#node.sendDisconnect(this.#guildId));
 
         if (!(await waitForVoiceDisconnect)) {
             this.#client._onPlayerDestroy(this.#guildId);
