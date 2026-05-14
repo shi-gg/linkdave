@@ -168,8 +168,6 @@ export class Player {
     }
 
     disconnect() {
-        this.#queue._deactivate();
-
         this.#client._sendToShard(this.#guildId, {
             op: GatewayOpcodes.VoiceStateUpdate,
             d: {
@@ -180,19 +178,12 @@ export class Player {
             }
         });
 
-        this.#voiceChannelId = null;
-        this.#state = PlayerState.Idle;
-        this.#current = null;
-        this.#position = 0;
-        this.#voiceState = null;
-        this.#pendingVoice = null;
+        this.#cleanup();
     }
 
     async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
         if (!data.channel_id) {
-            this.#voiceChannelId = null;
-            this.#voiceState = null;
-            this.#pendingVoice = null;
+            this.#cleanup();
 
             if (this.#node.connected) {
                 const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
@@ -212,13 +203,8 @@ export class Player {
     async handleVoiceServerUpdate(data: RawVoiceServerUpdate) {
         if (!data.endpoint) {
             const hadVoiceState = this.#voiceState !== null;
-            this.#voiceState = null;
+            this.#cleanup();
 
-            if (this.#pendingVoice) {
-                delete this.#pendingVoice.serverEvent;
-            }
-
-            // Only send disconnect if we had an active voice state to tear down.
             if (hadVoiceState && this.#node.connected) {
                 const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
                 if (err) this.#node.emit(EventName.Error, err as Error);
@@ -374,7 +360,7 @@ export class Player {
         this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped);
     }
 
-    _onVoiceDisconnect() {
+    #cleanup() {
         this.#voiceChannelId = null;
         this.#queue._deactivate();
         this.#voiceState = null;
@@ -382,6 +368,10 @@ export class Player {
         this.#state = PlayerState.Idle;
         this.#current = null;
         this.#position = 0;
+    }
+
+    _onVoiceDisconnect() {
+        this.#cleanup();
     }
 
     _onMigrateReady(data: MigrateReadyPayload) {
