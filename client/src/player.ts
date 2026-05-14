@@ -168,8 +168,6 @@ export class Player {
     }
 
     disconnect() {
-        this.#queue._deactivate();
-
         this.#client._sendToShard(this.#guildId, {
             op: GatewayOpcodes.VoiceStateUpdate,
             d: {
@@ -180,12 +178,7 @@ export class Player {
             }
         });
 
-        this.#voiceChannelId = null;
-        this.#state = PlayerState.Idle;
-        this.#current = null;
-        this.#position = 0;
-        this.#voiceState = null;
-        this.#pendingVoice = null;
+        this.#cleanup();
     }
 
     async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
