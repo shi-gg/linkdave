@@ -20,14 +20,15 @@ const (
 )
 
 type Player struct {
-	mutex      sync.RWMutex
-	guildID    snowflake.ID
-	channelID  snowflake.ID
-	state      string
-	currentURL string
-	position   int64
-	volume     int
-	startedAt  time.Time
+	mutex       sync.RWMutex
+	guildID     snowflake.ID
+	channelID   snowflake.ID
+	state       string
+	currentURL  string
+	position    int64
+	volume      int
+	startedAt   time.Time
+	requesterID string
 }
 
 type Client struct {
@@ -251,12 +252,25 @@ func (p *Player) SetChannelID(id snowflake.ID) {
 	p.mutex.Unlock()
 }
 
-func (p *Player) SetPlayingState(url string, position int64) {
+func (p *Player) SetPlayingState(url string, position int64, requesterID string) {
 	p.mutex.Lock()
 	p.state = protocol.PlayerStatePlaying
 	p.currentURL = url
 	p.position = position
 	p.startedAt = time.Now()
+	p.requesterID = requesterID
+	p.mutex.Unlock()
+}
+
+func (p *Player) GetRequesterID() string {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.requesterID
+}
+
+func (p *Player) SetRequesterID(id string) {
+	p.mutex.Lock()
+	p.requesterID = id
 	p.mutex.Unlock()
 }
 
@@ -280,9 +294,9 @@ func (p *Player) GetPlayerUpdateData() (state string, position int64, volume int
 	return p.state, p.position, p.volume
 }
 
-func (p *Player) GetMigrateData() (url string, position int64, volume int, state string) {
+func (p *Player) GetMigrateData() (url string, position int64, volume int, state string, requesterID string) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	calculatedPos := time.Since(p.startedAt).Milliseconds() + p.position
-	return p.currentURL, calculatedPos, p.volume, p.state
+	return p.currentURL, calculatedPos, p.volume, p.state, p.requesterID
 }

@@ -69,6 +69,7 @@ export interface PlayPayload {
     url: string;
     start_time?: number;
     volume?: number;
+    requester_id?: string;
 }
 
 export interface GuildPayload {
@@ -99,6 +100,7 @@ export interface TrackInfo {
     url: string;
     title?: string;
     duration: number;
+    requester_id?: string;
 }
 
 export interface TrackStartPayload {
@@ -157,6 +159,7 @@ export interface MigrateReadyPayload {
     position: number;
     volume: number;
     state: PlayerState;
+    requester_id?: string;
 }
 
 export interface ClosePayload {

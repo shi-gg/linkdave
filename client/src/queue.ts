@@ -1,17 +1,24 @@
 import type { Player } from "./player.js";
 import { EventName, type QueueErrorPayload } from "./types.js";
 
+export interface QueueItem {
+    uri: string;
+    requesterId?: string;
+}
+
 export class Queue {
     readonly #player: Player;
-    readonly #tracks: string[] = [];
+    readonly #tracks: QueueItem[] = [];
     #active = false;
 
     constructor(player: Player) {
         this.#player = player;
     }
 
-    add(uri: string) {
-        this.#tracks.push(uri);
+    add(uri: string, requesterId?: string) {
+        const item: QueueItem = { uri };
+        if (requesterId !== undefined) item.requesterId = requesterId;
+        this.#tracks.push(item);
         return this;
     }
 
@@ -44,7 +51,7 @@ export class Queue {
         this.#active = false;
     }
 
-    get tracks(): readonly string[] {
+    get tracks(): readonly QueueItem[] {
         return this.#tracks;
     }
 
@@ -67,13 +74,15 @@ export class Queue {
         const item = this.#tracks.shift();
         if (!item) return;
 
+        const playOptions: { requesterId?: string; } = {};
+        if (item.requesterId !== undefined) playOptions.requesterId = item.requesterId;
         this.#player
-            .play(item, undefined, true)
+            .play(item.uri, playOptions, true)
             .then(
                 () => null,
                 (error_: unknown) => {
                     const error = error_ instanceof Error ? error_ : new Error(String(error_));
-                    const payload: QueueErrorPayload = { guild_id: this.#player.guildId, url: item, error };
+                    const payload: QueueErrorPayload = { guild_id: this.#player.guildId, url: item.uri, error };
                     this.#player.node.emit(EventName.QueueError, payload);
                     this._onTrackEnd(true);
                 }
@@ -88,6 +97,8 @@ export class Queue {
         const item = this.#tracks.shift();
         if (!item) return;
 
-        await this.#player.play(item, undefined, true);
+        const playOptions: { requesterId?: string; } = {};
+        if (item.requesterId !== undefined) playOptions.requesterId = item.requesterId;
+        await this.#player.play(item.uri, playOptions, true);
     }
 }

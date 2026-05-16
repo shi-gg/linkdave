@@ -110,7 +110,7 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 		return
 	}
 
-	player.SetPlayingState(play.URL, play.StartTime)
+	player.SetPlayingState(play.URL, play.StartTime, play.RequesterID)
 
 	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
@@ -118,8 +118,9 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 		Data: protocol.TrackStartData{
 			GuildID: guildID,
 			Track: protocol.TrackInfo{
-				URL:      source.URL(),
-				Duration: source.Duration(),
+				URL:         source.URL(),
+				Duration:    source.Duration(),
+				RequesterID: play.RequesterID,
 			},
 		},
 	})
