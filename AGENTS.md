@@ -37,9 +37,11 @@ Always check your code with: `CGO_ENABLED=1 GOOS=linux go build -o /dev/null ./c
 3. Run the checks from the relevant section above
 4. Create commit
 
-If you can accurately express the change in just the subject line, don't include anything in the message body. Only use the body when it is providing *useful* information. Don't repeat information from the subject line in the message body.
+Label every PR and issue with `agent` + one of: `bug`, `documentation`, `enhancement`.
+
+If you can accurately express the change in just the subject line, don't include anything in the message body. Only use the body when it is providing *useful* information. Don't repeat information from the subject line in the message body. Add a `Co-authored-by: Agent <agent@wamellow.com>` trailer to every commit message.
 
 Follow good Git style:
 - Keep the subject line short
-- Follow conventional commit messages: `perf: `, `refactor: `, `fix: `, `feat: `, `test: `, `ci: `, `build: `, `chore: `, `docs: `, `style: `.
+- Follow conventional commit messages: `perf:`, `refactor:`, `fix:`, `feat:`, `test:`, `ci:`, `build:`, `chore:`, `docs:`, `style:`.
 - Instead of `feat: add this` use `feat: this` (no verb).
