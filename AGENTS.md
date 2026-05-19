@@ -39,7 +39,7 @@ Always check your code with: `CGO_ENABLED=1 GOOS=linux go build -o /dev/null ./c
 
 Label every PR and issue with `agent` + one of: `bug`, `documentation`, `enhancement`.
 
-If you can accurately express the change in just the subject line, don't include anything in the message body. Only use the body when it is providing *useful* information. Don't repeat information from the subject line in the message body. Add a `Co-authored-by: Agent <agent@wamellow.com>` trailer to every commit message.
+If you can accurately express the change in just the subject line, don't include anything in the message body. Only use the body when it is providing *useful* information. Don't repeat information from the subject line in the message body.
 
 Follow good Git style:
 - Keep the subject line short
