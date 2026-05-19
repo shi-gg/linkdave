@@ -109,16 +109,20 @@ func (s *Server) OnTrackException(sessionID string, guildID snowflake.ID, source
 
 	player := client.getPlayer(guildID)
 
+	trackInfo := protocol.TrackInfo{
+		URL:      source.URL(),
+		Duration: source.Duration(),
+	}
+	if player != nil {
+		trackInfo.RequesterID = player.GetRequesterID()
+	}
+
 	client.send(protocol.Message{
 		Op: protocol.OpTrackError,
 		Data: protocol.TrackErrorData{
 			GuildID: guildID,
-			Track: protocol.TrackInfo{
-				URL:         source.URL(),
-				Duration:    source.Duration(),
-				RequesterID: player.GetRequesterID(),
-			},
-			Error: err.Error(),
+			Track:   trackInfo,
+			Error:   err.Error(),
 		},
 	})
 }

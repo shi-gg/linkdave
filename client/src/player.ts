@@ -415,7 +415,7 @@ export class Player {
                     url: data.url,
                     start_time: data.position,
                     volume: data.volume,
-                    ...(data.requester_id && { requester_id: data.requester_id })
+                    ...(data.requester_id !== undefined && { requester_id: data.requester_id })
                 });
             };
 

@@ -278,6 +278,7 @@ func (p *Player) SetIdleState() {
 	p.mutex.Lock()
 	p.state = protocol.PlayerStateIdle
 	p.currentURL = ""
+	p.requesterID = ""
 	p.mutex.Unlock()
 }
 
