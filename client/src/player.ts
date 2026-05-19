@@ -140,8 +140,10 @@ export class Player {
                 if (this.#state === PlayerState.Connecting) {
                     this.#state = PlayerState.Idle;
                 }
+
                 this.#node.off(EventName.VoiceConnect, onConnect);
                 this.#node.off(EventName.VoiceDisconnect, onDisconnect);
+
                 clearTimeout(timer);
             };
 
@@ -163,6 +165,7 @@ export class Player {
             const onDisconnect = (event: VoiceDisconnectPayload) => {
                 if (event.guild_id !== this.#guildId) return;
                 if (event.reason === DisconnectReason.Requested) return;
+
                 cleanup();
                 reject(new Error(`Voice connection failed for guild "${this.#guildId}": ${event.reason ?? "unknown"}`));
             };

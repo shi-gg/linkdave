@@ -171,24 +171,18 @@ export class LinkDaveClient extends EventEmitter {
                 if (data.user_id !== this.#clientId) return;
 
                 const player = this.#players.get(data.guild_id);
-                if (!player) {
-                    break;
-                }
 
-                void player.handleVoiceStateUpdate({
+                void player?.handleVoiceStateUpdate({
                     user_id: data.user_id,
                     channel_id: data.channel_id,
                     session_id: data.session_id
                 });
+
                 break;
             }
             case GatewayDispatchEvents.VoiceServerUpdate: {
                 const player = this.#players.get(data.guild_id);
-                if (!player) {
-                    break;
-                }
-
-                void player.handleVoiceServerUpdate(data);
+                void player?.handleVoiceServerUpdate(data);
                 break;
             }
         }
@@ -271,16 +265,12 @@ export class LinkDaveClient extends EventEmitter {
     }
 
     #handleConnectionLost(player: Player) {
-        const channelId = player.voiceChannelId;
-
-        if (channelId) {
-            player.disconnect();
-        } else {
-            player._onVoiceDisconnect();
-        }
+        if (player.voiceChannelId) player.disconnect();
+        else player._onVoiceDisconnect();
 
         player.node.decrementPlayerCount();
         this.#players.delete(player.guildId);
+
         this.emit(EventName.VoiceDisconnect, {
             guild_id: player.guildId,
             reason: DisconnectReason.ConnectionLost
