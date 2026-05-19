@@ -30,7 +30,8 @@ export enum TrackEndReason {
 export enum PlayerState {
     Idle = "idle",
     Playing = "playing",
-    Paused = "paused"
+    Paused = "paused",
+    Connecting = "connecting"
 }
 
 export type ServerMessage =
@@ -124,6 +125,12 @@ export interface QueueErrorPayload {
     error: Error;
 }
 
+export enum DisconnectReason {
+    ConnectionLost = "connection_lost",
+    ConnectionFailed = "connection_failed",
+    Requested = "requested"
+}
+
 export interface VoiceConnectPayload {
     guild_id: string;
     channel_id: string;
@@ -131,7 +138,7 @@ export interface VoiceConnectPayload {
 
 export interface VoiceDisconnectPayload {
     guild_id: string;
-    reason?: string;
+    reason?: DisconnectReason;
 }
 
 export interface StatsPayload {

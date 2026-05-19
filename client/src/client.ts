@@ -16,6 +16,7 @@ import type {
     VoiceDisconnectPayload
 } from "./types.js";
 import {
+    DisconnectReason,
     EventName,
     ManagerEventName
 } from "./types.js";
@@ -166,23 +167,28 @@ export class LinkDaveClient extends EventEmitter {
     handleRaw({ t: event, d: data }: GatewayDispatchPayload) {
         switch (event) {
             case GatewayDispatchEvents.VoiceStateUpdate: {
-                // https://discord.com/developers/docs/resources/voice#voice-state-object
                 if (!data.guild_id) return;
                 if (data.user_id !== this.#clientId) return;
 
                 const player = this.#players.get(data.guild_id);
-                void player?.handleVoiceStateUpdate({
+                if (!player) {
+                    break;
+                }
+
+                void player.handleVoiceStateUpdate({
                     user_id: data.user_id,
                     channel_id: data.channel_id,
                     session_id: data.session_id
                 });
-
                 break;
             }
             case GatewayDispatchEvents.VoiceServerUpdate: {
                 const player = this.#players.get(data.guild_id);
-                void player?.handleVoiceServerUpdate(data);
+                if (!player) {
+                    break;
+                }
 
+                void player.handleVoiceServerUpdate(data);
                 break;
             }
         }
@@ -253,10 +259,32 @@ export class LinkDaveClient extends EventEmitter {
         const player = this.#players.get(data.guild_id);
         if (player?.node !== node) return;
 
+        if (data.reason === DisconnectReason.ConnectionLost) {
+            this.#handleConnectionLost(player);
+            return;
+        }
+
         player._onVoiceDisconnect();
-        this.emit(EventName.VoiceDisconnect, data);
         player.node.decrementPlayerCount();
         this.#players.delete(data.guild_id);
+        this.emit(EventName.VoiceDisconnect, data);
+    }
+
+    #handleConnectionLost(player: Player) {
+        const channelId = player.voiceChannelId;
+
+        if (channelId) {
+            player.disconnect();
+        } else {
+            player._onVoiceDisconnect();
+        }
+
+        player.node.decrementPlayerCount();
+        this.#players.delete(player.guildId);
+        this.emit(EventName.VoiceDisconnect, {
+            guild_id: player.guildId,
+            reason: DisconnectReason.ConnectionLost
+        });
     }
 
     _onPlayerDestroy(guildId: string) {

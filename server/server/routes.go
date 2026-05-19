@@ -310,7 +310,7 @@ func (s *Server) routeDisconnect(client *Client, guildID snowflake.ID, w http.Re
 		Op: protocol.OpVoiceDisconnect,
 		Data: protocol.VoiceDisconnectData{
 			GuildID: guildID,
-			Reason:  "requested",
+			Reason:  protocol.DisconnectReasonRequested,
 		},
 	})
 
