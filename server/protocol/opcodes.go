@@ -32,3 +32,9 @@ const (
 	PlayerStatePlaying = "playing"
 	PlayerStatePaused  = "paused"
 )
+
+const (
+	DisconnectReasonConnectionLost   = "connection_lost"
+	DisconnectReasonConnectionFailed = "connection_failed"
+	DisconnectReasonRequested        = "requested"
+)

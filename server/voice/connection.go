@@ -93,10 +93,26 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	}
 
 	var currentVoiceConn voice.Conn
+	var sigVoiceConn voice.Conn
+
 	currentVoiceConn = voice.NewConn(
 		c.guildID,
 		c.userID,
 		func(ctx context.Context, guildID snowflake.ID, channelID *snowflake.ID, selfMute, selfDeaf bool) error {
+			if channelID != nil {
+				return nil
+			}
+
+			if vc := sigVoiceConn; vc != nil && !c.closed.Load() {
+				vc.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
+					VoiceState: discord.VoiceState{
+						GuildID:   guildID,
+						ChannelID: nil,
+						UserID:    c.userID,
+					},
+				})
+			}
+
 			return nil
 		},
 		func() {
@@ -107,21 +123,25 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			}
 
 			c.mutex.Lock()
-			defer c.mutex.Unlock()
 			if c.targetVoiceConn != nil && c.voiceConn == currentVoiceConn {
+				c.mutex.Unlock()
 				return
 			}
 
 			isCurrent := c.voiceConn == currentVoiceConn
 			isTarget := c.targetVoiceConn == currentVoiceConn
+			c.mutex.Unlock()
 
 			if isCurrent || isTarget {
+				c.Stop()
 				c.onDisconnect()
 			}
 		},
 		voice.WithConnLogger(c.logger),
 		voice.WithConnDaveSessionCreateFunc(golibdave.NewSession),
 	)
+
+	sigVoiceConn = currentVoiceConn
 
 	c.mutex.Lock()
 	c.voiceConn = currentVoiceConn
@@ -284,7 +304,7 @@ func (c *Connection) Stop() {
 		c.source = nil
 		oldSource.Close()
 		if c.onTrackEnd != nil {
-			go c.onTrackEnd(oldSource, protocol.TrackEndReasonStopped, nil)
+			c.onTrackEnd(oldSource, protocol.TrackEndReasonStopped, nil)
 		}
 	}
 

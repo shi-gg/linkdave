@@ -13,7 +13,7 @@ import type {
     VoiceDisconnectPayload,
     VoiceServerEvent
 } from "./types.js";
-import { EventName, PlayerState, TrackEndReason } from "./types.js";
+import { DisconnectReason, EventName, PlayerState, TrackEndReason } from "./types.js";
 import { unwrap } from "./utils.js";
 
 export interface PlayOptions {
@@ -123,6 +123,7 @@ export class Player {
         }
 
         this.#voiceChannelId = targetChannel;
+        this.#state = PlayerState.Connecting;
 
         this.#client._sendToShard(this.#guildId, {
             op: GatewayOpcodes.VoiceStateUpdate,
@@ -136,8 +137,13 @@ export class Player {
 
         return new Promise<VoiceConnectPayload>((resolve, reject) => {
             const cleanup = () => {
+                if (this.#state === PlayerState.Connecting) {
+                    this.#state = PlayerState.Idle;
+                }
+
                 this.#node.off(EventName.VoiceConnect, onConnect);
                 this.#node.off(EventName.VoiceDisconnect, onDisconnect);
+
                 clearTimeout(timer);
             };
 
@@ -158,6 +164,8 @@ export class Player {
 
             const onDisconnect = (event: VoiceDisconnectPayload) => {
                 if (event.guild_id !== this.#guildId) return;
+                if (event.reason === DisconnectReason.Requested) return;
+
                 cleanup();
                 reject(new Error(`Voice connection failed for guild "${this.#guildId}": ${event.reason ?? "unknown"}`));
             };
@@ -183,9 +191,10 @@ export class Player {
 
     async handleVoiceStateUpdate(data: RawVoiceStateUpdate) {
         if (!data.channel_id) {
+            const hadVoiceState = this.#voiceState !== null;
             this.#cleanup();
 
-            if (this.#node.connected) {
+            if (hadVoiceState && this.#node.connected) {
                 const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
                 if (err) this.#node.emit(EventName.Error, err as Error);
             }
@@ -233,7 +242,6 @@ export class Player {
             return;
         }
 
-        // We have all the data, connect to LinkDave
         this.#connectToLinkDave(pending.channelId, pending.sessionId, pending.serverEvent);
         this.#pendingVoice = null;
     }
@@ -299,10 +307,8 @@ export class Player {
 
         const waitForVoiceDisconnect = this.#waitForNodeVoiceDisconnect(Player.CONNECT_TIMEOUT);
         await unwrap(this.#node.sendDisconnect(this.#guildId));
-
-        if (!(await waitForVoiceDisconnect)) {
-            this.#client._onPlayerDestroy(this.#guildId);
-        }
+        await waitForVoiceDisconnect;
+        this.#client._onPlayerDestroy(this.#guildId);
     }
 
     #waitForNodeVoiceDisconnect(timeoutMs: number) {

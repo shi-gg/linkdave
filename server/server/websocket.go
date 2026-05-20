@@ -131,7 +131,7 @@ func (s *Server) OnVoiceDisconnected(sessionID string, guildID snowflake.ID) {
 		Op: protocol.OpVoiceDisconnect,
 		Data: protocol.VoiceDisconnectData{
 			GuildID: guildID,
-			Reason:  "connection_lost",
+			Reason:  protocol.DisconnectReasonConnectionLost,
 		},
 	})
 }
@@ -249,7 +249,7 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 			Op: protocol.OpVoiceDisconnect,
 			Data: protocol.VoiceDisconnectData{
 				GuildID: update.GuildID,
-				Reason:  "connection_failed",
+				Reason:  protocol.DisconnectReasonConnectionFailed,
 			},
 		})
 
