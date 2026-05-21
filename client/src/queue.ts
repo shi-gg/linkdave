@@ -1,9 +1,9 @@
-import type { Player } from "./player.js";
+import type { Player, PlayOptions } from "./player.js";
 import { EventName, type QueueErrorPayload } from "./types.js";
 
 export interface QueueItem {
     uri: string;
-    requesterId?: string;
+    options: PlayOptions;
 }
 
 export class Queue {
@@ -15,10 +15,8 @@ export class Queue {
         this.#player = player;
     }
 
-    add(uri: string, requesterId?: string) {
-        const item: QueueItem = { uri };
-        if (requesterId !== undefined) item.requesterId = requesterId;
-        this.#tracks.push(item);
+    add(uri: string, options: PlayOptions = {}) {
+        this.#tracks.push({ uri, options });
         return this;
     }
 
@@ -74,10 +72,8 @@ export class Queue {
         const item = this.#tracks.shift();
         if (!item) return;
 
-        const playOptions: { requesterId?: string; } = {};
-        if (item.requesterId !== undefined) playOptions.requesterId = item.requesterId;
         this.#player
-            .play(item.uri, playOptions, true)
+            .play(item.uri, item.options, true)
             .then(
                 () => null,
                 (error_: unknown) => {
@@ -97,8 +93,6 @@ export class Queue {
         const item = this.#tracks.shift();
         if (!item) return;
 
-        const playOptions: { requesterId?: string; } = {};
-        if (item.requesterId !== undefined) playOptions.requesterId = item.requesterId;
-        await this.#player.play(item.uri, playOptions, true);
+        await this.#player.play(item.uri, item.options, true);
     }
 }
