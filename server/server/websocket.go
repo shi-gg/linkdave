@@ -83,6 +83,12 @@ func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, source audio
 		return
 	}
 
+	track := protocol.TrackInfo{
+		URL:         source.URL(),
+		Duration:    source.Duration(),
+		RequesterID: player.GetRequesterID(),
+	}
+
 	if reason != protocol.TrackEndReasonReplaced && reason != protocol.TrackEndReasonStopped {
 		player.SetIdleState()
 	}
@@ -91,12 +97,8 @@ func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, source audio
 		Op: protocol.OpTrackEnd,
 		Data: protocol.TrackEndData{
 			GuildID: guildID,
-			Track: protocol.TrackInfo{
-				URL:         source.URL(),
-				Duration:    source.Duration(),
-				RequesterID: player.GetRequesterID(),
-			},
-			Reason: reason,
+			Track:   track,
+			Reason:  reason,
 		},
 	})
 }
@@ -109,19 +111,20 @@ func (s *Server) OnTrackException(sessionID string, guildID snowflake.ID, source
 
 	player := client.getPlayer(guildID)
 
-	trackInfo := protocol.TrackInfo{
+	track := protocol.TrackInfo{
 		URL:      source.URL(),
 		Duration: source.Duration(),
 	}
+
 	if player != nil {
-		trackInfo.RequesterID = player.GetRequesterID()
+		track.RequesterID = player.GetRequesterID()
 	}
 
 	client.send(protocol.Message{
 		Op: protocol.OpTrackError,
 		Data: protocol.TrackErrorData{
 			GuildID: guildID,
-			Track:   trackInfo,
+			Track:   track,
 			Error:   err.Error(),
 		},
 	})

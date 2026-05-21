@@ -221,7 +221,7 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 		oldSource.Close()
 
 		if c.onTrackEnd != nil {
-			go c.onTrackEnd(oldSource, protocol.TrackEndReasonReplaced, nil)
+			c.onTrackEnd(oldSource, protocol.TrackEndReasonReplaced, nil)
 		}
 	}
 
@@ -284,7 +284,7 @@ func (c *Connection) Stop() {
 		c.source = nil
 		oldSource.Close()
 		if c.onTrackEnd != nil {
-			go c.onTrackEnd(oldSource, protocol.TrackEndReasonStopped, nil)
+			c.onTrackEnd(oldSource, protocol.TrackEndReasonStopped, nil)
 		}
 	}
 
