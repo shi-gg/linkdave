@@ -373,7 +373,7 @@ export class Player {
             this.#current = null;
             this.#state = PlayerState.Idle;
         }
-        this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped);
+        this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped && data.reason !== TrackEndReason.Replaced);
     }
 
     _onVoiceDisconnect() {
