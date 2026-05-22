@@ -32,7 +32,7 @@ func (f *DefaultFactory) CreateFromURL(ctx context.Context, url string, startTim
 		if !cfg.TextToSpeechEnabled {
 			return nil, fmt.Errorf("tts scheme is disabled")
 		}
-		return NewTTSSource(ctx, url, startTimeMs)
+		return NewTTSSource(ctx, url, startTimeMs, filters)
 	}
 
 	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {

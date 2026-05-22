@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/shi-gg/linkdave/server/audio/filter"
 )
 
 type ttsRequestBody struct {
@@ -33,7 +35,7 @@ var ttsClient = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
-func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3Source, error) {
+func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64, filters *filter.Filters) (*MP3Source, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse url: %w", err)
@@ -93,5 +95,5 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 	}
 
 	reader := io.NopCloser(bytes.NewReader(audioBytes))
-	return NewMP3SourceFromReader(reader, urlStr, startTimeMs, nil)
+	return NewMP3SourceFromReader(reader, urlStr, startTimeMs, filters)
 }
