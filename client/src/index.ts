@@ -1,4 +1,5 @@
 export * from "./client.js";
+export * from "./filters.js";
 export * from "./node.js";
 export * from "./player.js";
 export * from "./queue.js";

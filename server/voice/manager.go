@@ -7,7 +7,8 @@ import (
 	"sync"
 
 	"github.com/disgoorg/snowflake/v2"
-	"github.com/shi-gg/linkdave/server/audio"
+	"github.com/shi-gg/linkdave/server/audio/filter"
+	"github.com/shi-gg/linkdave/server/audio/source"
 	"github.com/shi-gg/linkdave/server/protocol"
 )
 
@@ -16,8 +17,8 @@ func connectionKey(sessionID string, guildID snowflake.ID) string {
 }
 
 type EventHandler interface {
-	OnTrackEnd(sessionID string, guildID snowflake.ID, source audio.Source, reason string)
-	OnTrackException(sessionID string, guildID snowflake.ID, source audio.Source, err error)
+	OnTrackEnd(sessionID string, guildID snowflake.ID, src source.Source, reason string)
+	OnTrackException(sessionID string, guildID snowflake.ID, src source.Source, err error)
 	OnVoiceDisconnected(sessionID string, guildID snowflake.ID)
 }
 
@@ -41,7 +42,7 @@ func (m *Manager) SetEventHandler(handler EventHandler) {
 	m.eventHandler = handler
 }
 
-func (m *Manager) onTrackEnd(sessionID string, guildID snowflake.ID, source audio.Source, reason string, err error) {
+func (m *Manager) onTrackEnd(sessionID string, guildID snowflake.ID, src source.Source, reason string, err error) {
 	m.mutex.RLock()
 	handler := m.eventHandler
 	m.mutex.RUnlock()
@@ -51,10 +52,10 @@ func (m *Manager) onTrackEnd(sessionID string, guildID snowflake.ID, source audi
 	}
 
 	if reason == protocol.TrackEndReasonError {
-		handler.OnTrackException(sessionID, guildID, source, err)
+		handler.OnTrackException(sessionID, guildID, src, err)
 	}
 
-	handler.OnTrackEnd(sessionID, guildID, source, reason)
+	handler.OnTrackEnd(sessionID, guildID, src, reason)
 }
 
 func (m *Manager) onDisconnect(sessionID string, guildID snowflake.ID, conn *Connection, key string) {
@@ -83,8 +84,8 @@ func (m *Manager) Connect(ctx context.Context, sessionID string, userID, guildID
 	}
 
 	var conn *Connection
-	conn, err := NewConnection(ctx, m.logger, userID, guildID, channelID, discordSessionID, event, func(source audio.Source, reason string, err error) {
-		m.onTrackEnd(sessionID, guildID, source, reason, err)
+	conn, err := NewConnection(ctx, m.logger, userID, guildID, channelID, discordSessionID, event, func(src source.Source, reason string, err error) {
+		m.onTrackEnd(sessionID, guildID, src, reason, err)
 	}, func() {
 		m.onDisconnect(sessionID, guildID, conn, key)
 	})
@@ -111,24 +112,24 @@ func (m *Manager) getConnection(sessionID string, guildID snowflake.ID) *Connect
 	return m.connections[connectionKey(sessionID, guildID)]
 }
 
-func (m *Manager) Play(ctx context.Context, sessionID string, guildID snowflake.ID, url string, startTime int64) (audio.Source, error) {
+func (m *Manager) Play(ctx context.Context, sessionID string, guildID snowflake.ID, url string, startTime int64, filters *filter.Filters) (source.Source, error) {
 	conn := m.getConnection(sessionID, guildID)
 	if conn == nil {
 		return nil, fmt.Errorf("no voice connection for guild %s", guildID)
 	}
 
-	factory := audio.NewDefaultFactory()
-	source, err := factory.CreateFromURL(ctx, url, startTime)
+	factory := source.NewDefaultFactory()
+	src, err := factory.CreateFromURL(ctx, url, startTime, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audio source: %w", err)
 	}
 
-	if err := conn.Play(ctx, source); err != nil {
-		source.Close()
+	if err := conn.Play(ctx, src); err != nil {
+		src.Close()
 		return nil, err
 	}
 
-	return source, nil
+	return src, nil
 }
 
 func (m *Manager) Pause(sessionID string, guildID snowflake.ID) error {

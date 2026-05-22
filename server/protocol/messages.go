@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/shi-gg/linkdave/server/audio/filter"
 )
 
 type Message struct {
@@ -112,12 +113,13 @@ type PlayerMigrateData struct {
 }
 
 type MigrateReadyData struct {
-	GuildID     snowflake.ID `json:"guild_id"`
-	URL         string       `json:"url"`
-	Position    int64        `json:"position"`
-	Volume      int          `json:"volume"`
-	State       string       `json:"state"`
-	RequesterID string       `json:"requester_id,omitempty"`
+	GuildID     snowflake.ID    `json:"guild_id"`
+	URL         string          `json:"url"`
+	Position    int64           `json:"position"`
+	Volume      int             `json:"volume"`
+	State       string          `json:"state"`
+	RequesterID string          `json:"requester_id,omitempty"`
+	Filters     *filter.Filters `json:"filters,omitempty"`
 }
 
 type StatsResponse struct {
@@ -129,10 +131,11 @@ type StatsResponse struct {
 }
 
 type RequestPlay struct {
-	URL         string `json:"url"`
-	StartTime   int64  `json:"start_time,omitempty"`
-	Volume      int    `json:"volume,omitempty"`
-	RequesterID string `json:"requester_id,omitempty"`
+	URL         string          `json:"url"`
+	StartTime   int64           `json:"start_time,omitempty"`
+	Volume      int             `json:"volume,omitempty"`
+	RequesterID string          `json:"requester_id,omitempty"`
+	Filters     *filter.Filters `json:"filters,omitempty"`
 }
 
 type RequestSeek struct {

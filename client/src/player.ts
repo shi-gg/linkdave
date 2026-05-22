@@ -1,9 +1,11 @@
 import { GatewayOpcodes, type GatewayVoiceServerUpdateDispatchData, type GatewayVoiceStateUpdateDispatchData } from "discord-api-types/v10";
 
 import type { LinkDaveClient } from "./client.js";
+import { PlayerFilters } from "./filters.js";
 import type { Node } from "./node.js";
 import { Queue } from "./queue.js";
 import type {
+    FiltersPayload,
     MigrateReadyPayload,
     PlayerUpdatePayload,
     TrackEndPayload,
@@ -20,6 +22,7 @@ export interface PlayOptions {
     startTime?: number;
     volume?: number;
     requesterId?: string;
+    filters?: FiltersPayload;
 }
 
 export interface PlayerOptions {
@@ -49,8 +52,9 @@ export class Player {
     readonly #client: LinkDaveClient;
     readonly #guildId: string;
     readonly #queue: Queue;
-    #node: Node;
+    readonly #filters = new PlayerFilters();
 
+    #node: Node;
     #voiceChannelId: string | null = null;
     #selfMute: boolean;
     #selfDeaf: boolean;
@@ -115,6 +119,10 @@ export class Player {
 
     get connected() {
         return this.#voiceState !== null;
+    }
+
+    get filters(): PlayerFilters {
+        return this.#filters;
     }
 
     connect(channelId?: string, timeoutMs = Player.CONNECT_TIMEOUT) {
@@ -266,11 +274,13 @@ export class Player {
     }
 
     async #sendPlay(url: string, options: PlayOptions = {}) {
+        const filters = options.filters ?? this.#filters.toPayload();
         await this.#node.sendPlay(this.#guildId, {
             url,
             ...(options.startTime !== undefined && { start_time: options.startTime }),
             ...(options.volume !== undefined && { volume: options.volume }),
-            ...(options.requesterId !== undefined && { requester_id: options.requesterId })
+            ...(options.requesterId !== undefined && { requester_id: options.requesterId }),
+            ...(filters !== undefined && { filters })
         });
     }
 
@@ -413,7 +423,8 @@ export class Player {
                     url: data.url,
                     start_time: data.position,
                     volume: data.volume,
-                    ...(data.requester_id !== undefined && { requester_id: data.requester_id })
+                    ...(data.requester_id !== undefined && { requester_id: data.requester_id }),
+                    ...(data.filters !== undefined && { filters: data.filters })
                 });
             };
 

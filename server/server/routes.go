@@ -94,6 +94,12 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 		return
 	}
 
+	if err := play.Filters.Validate(); err != nil {
+		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: err.Error()})
+		return
+	}
+	play.Filters = play.Filters.Normalize()
+
 	if play.Volume > 0 {
 		player.SetVolume(play.Volume)
 	}
@@ -103,14 +109,14 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 		slog.String("url", play.URL),
 	)
 
-	source, err := s.voiceManager.Play(context.Background(), client.sessionID, guildID, play.URL, play.StartTime)
+	source, err := s.voiceManager.Play(context.Background(), client.sessionID, guildID, play.URL, play.StartTime, play.Filters)
 	if err != nil {
 		s.logger.Error("playback failed", slog.Any("error", err))
 		writeJSON(w, http.StatusInternalServerError, protocol.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	player.SetPlayingState(play.URL, play.StartTime, play.RequesterID)
+	player.SetPlayingState(play.URL, play.StartTime, play.RequesterID, play.Filters)
 
 	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{

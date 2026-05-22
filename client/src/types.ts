@@ -34,6 +34,27 @@ export enum PlayerState {
     Connecting = "connecting"
 }
 
+export enum Filter {
+    /** Slows and lowers pitch (speed ×0.8, pitch ×0.8). */
+    Vaporwave = 0,
+    /** Speeds up and raises pitch (speed ×1.3, pitch ×1.3). */
+    Nightcore = 1,
+    /** Rotates audio around the stereo field at 0.2 Hz. */
+    Rotation = 2,
+    /** Oscillates volume at 4 Hz with 0.6 depth. */
+    Tremolo = 3,
+    /** Oscillates pitch at 4 Hz with 0.5 depth. */
+    Vibrato = 4,
+    /** Suppresses high frequencies (smoothing factor 20). */
+    LowPass = 5
+}
+
+export interface FiltersPayload {
+    enabled?: Filter[];
+    pitch?: number;
+    speed?: number;
+}
+
 export type ServerMessage =
     | { op: ServerOpCodes.Ready; d: ReadyPayload; }
     | { op: ServerOpCodes.PlayerUpdate; d: PlayerUpdatePayload; }
@@ -71,6 +92,7 @@ export interface PlayPayload {
     start_time?: number;
     volume?: number;
     requester_id?: string;
+    filters?: FiltersPayload;
 }
 
 export interface GuildPayload {
@@ -167,6 +189,7 @@ export interface MigrateReadyPayload {
     volume: number;
     state: PlayerState;
     requester_id?: string;
+    filters?: FiltersPayload;
 }
 
 export interface ClosePayload {

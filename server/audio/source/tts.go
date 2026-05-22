@@ -1,4 +1,4 @@
-package audio
+package source
 
 import (
 	"bytes"
@@ -12,15 +12,17 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/shi-gg/linkdave/server/audio/filter"
 )
 
-type RequestBody struct {
+type ttsRequestBody struct {
 	Text      string `json:"text"`
 	Speaker   string `json:"speaker"`
 	Translate bool   `json:"translate"`
 }
 
-type InvokeResponse struct {
+type ttsInvokeResponse struct {
 	Code string `json:"code"`
 
 	SKey     string `json:"s_key"`
@@ -29,20 +31,18 @@ type InvokeResponse struct {
 	Speaker  string `json:"speaker"`
 }
 
-var (
-	client = &http.Client{
-		Timeout: 10 * time.Second,
-	}
-)
+var ttsClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
 
-func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3Source, error) {
+func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64, filters *filter.Filters) (*MP3Source, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse url: %w", err)
 	}
 
 	query := parsedURL.Query()
-	reqBody := RequestBody{
+	reqBody := ttsRequestBody{
 		Text:      query.Get("text"),
 		Speaker:   query.Get("speaker"),
 		Translate: query.Get("translate") == "true",
@@ -53,15 +53,15 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 		return nil, fmt.Errorf("encode req body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", config.TextToSpeechURL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", cfg.TextToSpeechURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", config.UserAgent)
+	req.Header.Set("User-Agent", cfg.UserAgent)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := ttsClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch tts: %w", err)
 	}
@@ -76,7 +76,7 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
 
-	var data InvokeResponse
+	var data ttsInvokeResponse
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, fmt.Errorf("parse tts response: %w", err)
 	}
@@ -95,10 +95,5 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64) (*MP3So
 	}
 
 	reader := io.NopCloser(bytes.NewReader(audioBytes))
-	source, err := NewMP3SourceFromReader(reader, urlStr, startTimeMs)
-	if err != nil {
-		return nil, err
-	}
-
-	return source, nil
+	return NewMP3SourceFromReader(reader, urlStr, startTimeMs, filters)
 }
