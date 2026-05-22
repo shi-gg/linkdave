@@ -13,7 +13,7 @@ import (
 	"github.com/disgoorg/disgo/voice"
 	"github.com/disgoorg/godave/golibdave"
 	"github.com/disgoorg/snowflake/v2"
-	"github.com/shi-gg/linkdave/server/audio"
+	"github.com/shi-gg/linkdave/server/audio/source"
 	"github.com/shi-gg/linkdave/server/protocol"
 )
 
@@ -26,8 +26,8 @@ type Connection struct {
 	voiceConn       voice.Conn
 	targetVoiceConn voice.Conn
 
-	source       audio.Source
-	onTrackEnd   func(source audio.Source, reason string, err error)
+	source       source.Source
+	onTrackEnd   func(src source.Source, reason string, err error)
 	onDisconnect func()
 	paused       atomic.Bool
 	closed       atomic.Bool
@@ -46,7 +46,7 @@ func NewConnection(
 	userID, guildID, channelID snowflake.ID,
 	sessionID string,
 	voiceServerEvent protocol.VoiceServerEvent,
-	onTrackEnd func(source audio.Source, reason string, err error),
+	onTrackEnd func(src source.Source, reason string, err error),
 	onDisconnect func(),
 ) (*Connection, error) {
 	conn := &Connection{
@@ -231,7 +231,7 @@ func (c *Connection) HandleVoiceUpdate(ctx context.Context, channelID snowflake.
 	return c.setupVoiceConn(ctx, channelID, sessionID, event)
 }
 
-func (c *Connection) Play(ctx context.Context, source audio.Source) error {
+func (c *Connection) Play(ctx context.Context, src source.Source) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -245,7 +245,7 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 		}
 	}
 
-	c.source = source
+	c.source = src
 	c.paused.Store(false)
 
 	select {
@@ -255,7 +255,7 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 	}
 
 	c.safeSetOpusFrameProvider(c.voiceConn, &trackWrapper{
-		source: source,
+		source: src,
 		conn:   c,
 	})
 
@@ -311,9 +311,9 @@ func (c *Connection) Stop() {
 	c.safeSetOpusFrameProvider(c.voiceConn, nil)
 }
 
-func (c *Connection) handleTrackEnd(source audio.Source, err error) {
+func (c *Connection) handleTrackEnd(src source.Source, err error) {
 	c.mutex.Lock()
-	if c.source != source {
+	if c.source != src {
 		c.mutex.Unlock()
 		return
 	}
@@ -321,17 +321,17 @@ func (c *Connection) handleTrackEnd(source audio.Source, err error) {
 	c.mutex.Unlock()
 
 	reason := protocol.TrackEndReasonFinished
-	if err != nil && err != audio.ErrEOF {
+	if err != nil && err != source.ErrEOF {
 		reason = protocol.TrackEndReasonError
 	}
 
 	if c.onTrackEnd != nil {
-		c.onTrackEnd(source, reason, err)
+		c.onTrackEnd(src, reason, err)
 	}
 }
 
 type trackWrapper struct {
-	source audio.Source
+	source source.Source
 	conn   *Connection
 }
 
@@ -369,10 +369,10 @@ func (c *Connection) maybeSetOpusProvider(vc voice.Conn, provider voice.OpusFram
 	}
 }
 
-func (c *Connection) provideOpusFrame(source audio.Source) ([]byte, error) {
-	frame, err := source.ProvideOpusFrame()
+func (c *Connection) provideOpusFrame(src source.Source) ([]byte, error) {
+	frame, err := src.ProvideOpusFrame()
 	if err != nil {
-		c.handleTrackEnd(source, err)
+		c.handleTrackEnd(src, err)
 	}
 	return frame, err
 }

@@ -1,4 +1,4 @@
-package audio
+package source
 
 import (
 	"fmt"
@@ -15,11 +15,11 @@ func ValidateHost(urlStr string) (string, error) {
 
 	switch parsedURL.Scheme {
 	case "http":
-		if !config.HTTPEnabled {
+		if !cfg.HTTPEnabled {
 			return "", fmt.Errorf("http scheme is disabled")
 		}
 	case "https":
-		if !config.HTTPSEnabled {
+		if !cfg.HTTPSEnabled {
 			return "", fmt.Errorf("https scheme is disabled")
 		}
 	default:
@@ -31,12 +31,12 @@ func ValidateHost(urlStr string) (string, error) {
 		return "", fmt.Errorf("empty hostname")
 	}
 
-	if config.PrivateIPAddressEnabled && config.PublicIPAddressEnabled {
+	if cfg.PrivateIPAddressEnabled && cfg.PublicIPAddressEnabled {
 		return host, nil
 	}
 
 	if strings.ToLower(host) == "localhost" {
-		if !config.PrivateIPAddressEnabled {
+		if !cfg.PrivateIPAddressEnabled {
 			return "", fmt.Errorf("localhost not allowed")
 		}
 		return "127.0.0.1", nil
@@ -55,13 +55,13 @@ func ValidateHost(urlStr string) (string, error) {
 	}
 
 	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
-		if !config.PrivateIPAddressEnabled {
+		if !cfg.PrivateIPAddressEnabled {
 			return "", fmt.Errorf("private IP address not allowed")
 		}
 		return ip.String(), nil
 	}
 
-	if !config.PublicIPAddressEnabled {
+	if !cfg.PublicIPAddressEnabled {
 		return "", fmt.Errorf("public IP address not allowed")
 	}
 

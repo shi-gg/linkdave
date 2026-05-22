@@ -1,4 +1,4 @@
-package audio
+package source
 
 import (
 	"bytes"
@@ -15,15 +15,16 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/shi-gg/linkdave/server/audio/filter"
 	"github.com/tosone/minimp3"
 	"gopkg.in/hraban/opus.v2"
 )
 
 const (
-	OPUS_SAMPLE_RATE       = 48000 // Discord expects 48kHz, stereo, 20ms frames
+	OPUS_SAMPLE_RATE       = 48000
 	OPUS_CHANNELS          = 2
-	OPUS_FRAME_SIZE        = 960                                       // 20ms at 48kHz (48000 * 0.020)
-	OPUS_FRAME_DURATION_MS = OPUS_FRAME_SIZE * 1000 / OPUS_SAMPLE_RATE // 20ms
+	OPUS_FRAME_SIZE        = 960
+	OPUS_FRAME_DURATION_MS = OPUS_FRAME_SIZE * 1000 / OPUS_SAMPLE_RATE
 	OPUS_MAX_FRAME_BYTES   = 4000
 
 	IDLE_TIMEOUT       = 10 * time.Second
@@ -130,12 +131,14 @@ type MP3Source struct {
 	resampleRatio float64
 	duration      int64
 
+	filterProc *filter.Processor
+
 	position atomic.Int64
 	closed   atomic.Bool
 	mutex    sync.Mutex
 }
 
-func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*MP3Source, error) {
+func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64, filters *filter.Filters) (*MP3Source, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse URL: %w", err)
@@ -146,7 +149,7 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", config.UserAgent)
+	req.Header.Set("User-Agent", cfg.UserAgent)
 
 	resp, err := clientForIP(ip).Do(req)
 	if err != nil {
@@ -175,7 +178,7 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64) (*M
 		closer: body,
 	}
 
-	source, err := NewMP3SourceFromReader(reader, urlStr, startTimeMs)
+	source, err := NewMP3SourceFromReader(reader, urlStr, startTimeMs, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +237,7 @@ func parseXingFrames(data []byte) int64 {
 	return 0
 }
 
-func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64) (*MP3Source, error) {
+func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64, filters *filter.Filters) (*MP3Source, error) {
 	decoder, err := minimp3.NewDecoder(reader)
 	if err != nil {
 		reader.Close()
@@ -262,8 +265,16 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 		return nil, fmt.Errorf("unsupported channel count: %d", srcChannels)
 	}
 
-	resampleRatio := float64(OPUS_SAMPLE_RATE) / float64(srcSampleRate)
-	inputSamplesPerChannel := int(float64(OPUS_FRAME_SIZE) / resampleRatio)
+	baseResampleRatio := float64(OPUS_SAMPLE_RATE) / float64(srcSampleRate)
+
+	var filterProc *filter.Processor
+	effectiveResampleRatio := baseResampleRatio
+	if filters != nil && !filters.IsEmpty() {
+		filterProc = filter.NewProcessor(filters, float64(OPUS_SAMPLE_RATE))
+		effectiveResampleRatio = baseResampleRatio / (filterProc.PitchRatio() * filterProc.TimescaleRatio())
+	}
+
+	inputSamplesPerChannel := int(float64(OPUS_FRAME_SIZE) / effectiveResampleRatio)
 
 	if inputSamplesPerChannel < 1 {
 		inputSamplesPerChannel = 1
@@ -294,7 +305,8 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64)
 		opusBuffer:    make([]byte, OPUS_MAX_FRAME_BYTES),
 		srcSampleRate: srcSampleRate,
 		srcChannels:   srcChannels,
-		resampleRatio: resampleRatio,
+		resampleRatio: effectiveResampleRatio,
+		filterProc:    filterProc,
 	}
 
 	source.position.Store(startTimeMs)
@@ -335,6 +347,10 @@ func (s *MP3Source) ProvideOpusFrame() ([]byte, error) {
 		s.resampleLinear(s.inputSamples, s.pcmSamples)
 	} else {
 		copy(s.pcmSamples, s.inputSamples)
+	}
+
+	if s.filterProc != nil {
+		s.filterProc.Process(s.pcmSamples)
 	}
 
 	numBytes, err := s.encoder.Encode(s.pcmSamples, s.opusBuffer)

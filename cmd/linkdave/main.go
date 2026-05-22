@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shi-gg/linkdave/server/audio"
+	"github.com/shi-gg/linkdave/server/audio/source"
 	"github.com/shi-gg/linkdave/server/server"
 	"github.com/shi-gg/linkdave/server/voice"
 )
@@ -34,7 +34,7 @@ func main() {
 		slog.String("version", version),
 	)
 
-	audio.SetVersion(version)
+	source.SetVersion(version)
 	voiceManager := voice.NewManager(logger)
 	server := server.NewServer(logger, voiceManager, version, password)
 

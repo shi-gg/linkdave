@@ -9,6 +9,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/shi-gg/linkdave/server/audio/filter"
 	"github.com/shi-gg/linkdave/server/protocol"
 )
 
@@ -29,6 +30,7 @@ type Player struct {
 	volume      int
 	startedAt   time.Time
 	requesterID string
+	filters     *filter.Filters
 }
 
 type Client struct {
@@ -252,13 +254,14 @@ func (p *Player) SetChannelID(id snowflake.ID) {
 	p.mutex.Unlock()
 }
 
-func (p *Player) SetPlayingState(url string, position int64, requesterID string) {
+func (p *Player) SetPlayingState(url string, position int64, requesterID string, filters *filter.Filters) {
 	p.mutex.Lock()
 	p.state = protocol.PlayerStatePlaying
 	p.currentURL = url
 	p.position = position
 	p.startedAt = time.Now()
 	p.requesterID = requesterID
+	p.filters = filters
 	p.mutex.Unlock()
 }
 
@@ -295,9 +298,9 @@ func (p *Player) GetPlayerUpdateData() (state string, position int64, volume int
 	return p.state, p.position, p.volume
 }
 
-func (p *Player) GetMigrateData() (url string, position int64, volume int, state string, requesterID string) {
+func (p *Player) GetMigrateData() (url string, position int64, volume int, state string, requesterID string, filters *filter.Filters) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	calculatedPos := time.Since(p.startedAt).Milliseconds() + p.position
-	return p.currentURL, calculatedPos, p.volume, p.state, p.requesterID
+	return p.currentURL, calculatedPos, p.volume, p.state, p.requesterID, p.filters
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/gorilla/websocket"
-	"github.com/shi-gg/linkdave/server/audio"
+	"github.com/shi-gg/linkdave/server/audio/source"
 	"github.com/shi-gg/linkdave/server/protocol"
 	"github.com/shi-gg/linkdave/server/voice"
 )
@@ -72,7 +72,7 @@ func (s *Server) sendStats() {
 	}
 }
 
-func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, source audio.Source, reason string) {
+func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, src source.Source, reason string) {
 	client := s.getClientBySession(sessionID)
 	if client == nil {
 		return
@@ -84,8 +84,8 @@ func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, source audio
 	}
 
 	track := protocol.TrackInfo{
-		URL:         source.URL(),
-		Duration:    source.Duration(),
+		URL:         src.URL(),
+		Duration:    src.Duration(),
 		RequesterID: player.GetRequesterID(),
 	}
 
@@ -103,7 +103,7 @@ func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, source audio
 	})
 }
 
-func (s *Server) OnTrackException(sessionID string, guildID snowflake.ID, source audio.Source, err error) {
+func (s *Server) OnTrackException(sessionID string, guildID snowflake.ID, src source.Source, err error) {
 	client := s.getClientBySession(sessionID)
 	if client == nil {
 		return
@@ -112,8 +112,8 @@ func (s *Server) OnTrackException(sessionID string, guildID snowflake.ID, source
 	player := client.getPlayer(guildID)
 
 	track := protocol.TrackInfo{
-		URL:      source.URL(),
-		Duration: source.Duration(),
+		URL:      src.URL(),
+		Duration: src.Duration(),
 	}
 
 	if player != nil {
@@ -299,7 +299,7 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 		return
 	}
 
-	url, position, volume, state, requesterID := player.GetMigrateData()
+	url, position, volume, state, requesterID, filters := player.GetMigrateData()
 	client.send(protocol.Message{
 		Op: protocol.OpMigrateReady,
 		Data: protocol.MigrateReadyData{
@@ -309,6 +309,7 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 			Volume:      volume,
 			State:       state,
 			RequesterID: requesterID,
+			Filters:     filters,
 		},
 	})
 

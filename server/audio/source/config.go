@@ -1,11 +1,11 @@
-package audio
+package source
 
 import (
 	"os"
 	"strconv"
 )
 
-type SourceConfig struct {
+type Config struct {
 	HTTPEnabled             bool
 	HTTPSEnabled            bool
 	PublicIPAddressEnabled  bool
@@ -15,10 +15,10 @@ type SourceConfig struct {
 	UserAgent               string
 }
 
-var config SourceConfig
+var cfg Config
 
 func init() {
-	config = SourceConfig{
+	cfg = Config{
 		HTTPEnabled:             getEnvBool("LINKDAVE_SOURCE_HTTP_ENABLED", false),
 		HTTPSEnabled:            getEnvBool("LINKDAVE_SOURCE_HTTPS_ENABLED", false),
 		PublicIPAddressEnabled:  getEnvBool("LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED", false),
@@ -29,11 +29,11 @@ func init() {
 }
 
 func SetVersion(v string) {
-	config.UserAgent = "Linkdave/" + v
+	cfg.UserAgent = "Linkdave/" + v
 }
 
-func GetConfig() SourceConfig {
-	return config
+func GetConfig() Config {
+	return cfg
 }
 
 func getEnvBool(key string, defaultValue bool) bool {

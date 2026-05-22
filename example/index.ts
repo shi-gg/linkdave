@@ -1,10 +1,24 @@
+import type { FiltersPayload } from "linkdave";
 import { Client, Events, GatewayIntentBits } from "discord.js";
-import { constructUri, EventName, LinkDaveClient } from "linkdave";
+import { constructUri, EventName, Filter, LinkDaveClient } from "linkdave";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN!;
 if (!DISCORD_TOKEN) {
     console.error("DISCORD_TOKEN required");
     process.exit(1);
+}
+
+function parseFilter(name: string): Filter | null {
+    const id = Number(name);
+    if (!Number.isNaN(id) && Filter[id] !== undefined) return id;
+    const key = Object.keys(Filter).find(k => k.toLowerCase() === name.toLowerCase());
+    return key !== undefined ? Filter[key as keyof typeof Filter] : null;
+}
+
+function parseFilters(args: string[]): FiltersPayload | undefined {
+    const filter = parseFilter(args[0]);
+    if (filter === null) return undefined;
+    return { enabled: [filter] };
 }
 
 const discord = new Client({
@@ -68,6 +82,22 @@ discord.on(Events.MessageCreate, async (msg) => {
             player.queue.add(args[0]);
             if (!player.playing) await player.queue.start();
             break;
+        case "!play-filter": {
+            const filters = parseFilters(args);
+            if (!filters) {
+                void msg.reply("Unknown filter. Try: Nightcore, Vaporwave, Tremolo, Vibrato, Rotation, LowPass");
+                return;
+            }
+            player.queue.add(args[1], { filters });
+            if (!player.playing) await player.queue.start();
+            break;
+        }
+        case "!play-now": {
+            const filters = parseFilters(args);
+            const url = filters ? args[1] : args[0];
+            await player.play(url, filters ? { filters } : {});
+            break;
+        }
         case "!tts":
             player.queue.add(constructUri.tts(args.join(" "), "en_us_001"));
             if (!player.playing) await player.queue.start();
@@ -84,6 +114,21 @@ discord.on(Events.MessageCreate, async (msg) => {
         case "!leave": await player.destroy(); break;
         case "!volume": await player.setVolume(parseInt(args[0], 10) * 10); break;
         case "!get-channel": await msg.reply(`Current channel: <#${player.voiceChannelId}>`); break;
+        case "!current-track": await msg.reply(`Current track: ${player.current?.url}`); break;
+        case "!set-filter": {
+            const filter = parseFilter(args[0]);
+            if (filter === null) {
+                void msg.reply("Unknown filter. Try: Nightcore, Vaporwave, Tremolo, Vibrato, Rotation, LowPass");
+                return;
+            }
+            player.filters.toggle(filter, true);
+            void msg.reply(`Active filters: ${player.filters.activeFilters.map(f => Filter[f]).join(", ")}`);
+            break;
+        }
+        case "!clear-filters": {
+            player.filters.clear();
+            break;
+        }
     }
 });
 
