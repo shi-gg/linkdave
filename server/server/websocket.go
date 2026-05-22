@@ -83,6 +83,12 @@ func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, source audio
 		return
 	}
 
+	track := protocol.TrackInfo{
+		URL:         source.URL(),
+		Duration:    source.Duration(),
+		RequesterID: player.GetRequesterID(),
+	}
+
 	if reason != protocol.TrackEndReasonReplaced && reason != protocol.TrackEndReasonStopped {
 		player.SetIdleState()
 	}
@@ -91,11 +97,8 @@ func (s *Server) OnTrackEnd(sessionID string, guildID snowflake.ID, source audio
 		Op: protocol.OpTrackEnd,
 		Data: protocol.TrackEndData{
 			GuildID: guildID,
-			Track: protocol.TrackInfo{
-				URL:      source.URL(),
-				Duration: source.Duration(),
-			},
-			Reason: reason,
+			Track:   track,
+			Reason:  reason,
 		},
 	})
 }
@@ -106,15 +109,23 @@ func (s *Server) OnTrackException(sessionID string, guildID snowflake.ID, source
 		return
 	}
 
+	player := client.getPlayer(guildID)
+
+	track := protocol.TrackInfo{
+		URL:      source.URL(),
+		Duration: source.Duration(),
+	}
+
+	if player != nil {
+		track.RequesterID = player.GetRequesterID()
+	}
+
 	client.send(protocol.Message{
 		Op: protocol.OpTrackError,
 		Data: protocol.TrackErrorData{
 			GuildID: guildID,
-			Track: protocol.TrackInfo{
-				URL:      source.URL(),
-				Duration: source.Duration(),
-			},
-			Error: err.Error(),
+			Track:   track,
+			Error:   err.Error(),
 		},
 	})
 }
@@ -288,15 +299,16 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 		return
 	}
 
-	url, position, volume, state := player.GetMigrateData()
+	url, position, volume, state, requesterID := player.GetMigrateData()
 	client.send(protocol.Message{
 		Op: protocol.OpMigrateReady,
 		Data: protocol.MigrateReadyData{
-			GuildID:  migrate.GuildID,
-			URL:      url,
-			Position: position,
-			Volume:   volume,
-			State:    state,
+			GuildID:     migrate.GuildID,
+			URL:         url,
+			Position:    position,
+			Volume:      volume,
+			State:       state,
+			RequesterID: requesterID,
 		},
 	})
 

@@ -61,9 +61,10 @@ type PlayerUpdateData struct {
 }
 
 type TrackInfo struct {
-	URL      string `json:"url"`
-	Title    string `json:"title,omitempty"`
-	Duration int64  `json:"duration,omitempty"`
+	URL         string `json:"url"`
+	Title       string `json:"title,omitempty"`
+	Duration    int64  `json:"duration,omitempty"`
+	RequesterID string `json:"requester_id,omitempty"`
 }
 
 type TrackStartData struct {
@@ -111,11 +112,12 @@ type PlayerMigrateData struct {
 }
 
 type MigrateReadyData struct {
-	GuildID  snowflake.ID `json:"guild_id"`
-	URL      string       `json:"url"`
-	Position int64        `json:"position"`
-	Volume   int          `json:"volume"`
-	State    string       `json:"state"`
+	GuildID     snowflake.ID `json:"guild_id"`
+	URL         string       `json:"url"`
+	Position    int64        `json:"position"`
+	Volume      int          `json:"volume"`
+	State       string       `json:"state"`
+	RequesterID string       `json:"requester_id,omitempty"`
 }
 
 type StatsResponse struct {
@@ -127,9 +129,10 @@ type StatsResponse struct {
 }
 
 type RequestPlay struct {
-	URL       string `json:"url"`
-	StartTime int64  `json:"start_time,omitempty"`
-	Volume    int    `json:"volume,omitempty"`
+	URL         string `json:"url"`
+	StartTime   int64  `json:"start_time,omitempty"`
+	Volume      int    `json:"volume,omitempty"`
+	RequesterID string `json:"requester_id,omitempty"`
 }
 
 type RequestSeek struct {

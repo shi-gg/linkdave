@@ -1,17 +1,22 @@
-import type { Player } from "./player.js";
+import type { Player, PlayOptions } from "./player.js";
 import { EventName, type QueueErrorPayload } from "./types.js";
+
+export interface QueueItem {
+    uri: string;
+    options: PlayOptions;
+}
 
 export class Queue {
     readonly #player: Player;
-    readonly #tracks: string[] = [];
+    readonly #tracks: QueueItem[] = [];
     #active = false;
 
     constructor(player: Player) {
         this.#player = player;
     }
 
-    add(uri: string) {
-        this.#tracks.push(uri);
+    add(uri: string, options: PlayOptions = {}) {
+        this.#tracks.push({ uri, options });
         return this;
     }
 
@@ -44,7 +49,7 @@ export class Queue {
         this.#active = false;
     }
 
-    get tracks(): readonly string[] {
+    get tracks(): readonly QueueItem[] {
         return this.#tracks;
     }
 
@@ -68,12 +73,12 @@ export class Queue {
         if (!item) return;
 
         this.#player
-            .play(item, undefined, true)
+            .play(item.uri, item.options, true)
             .then(
                 () => null,
                 (error_: unknown) => {
                     const error = error_ instanceof Error ? error_ : new Error(String(error_));
-                    const payload: QueueErrorPayload = { guild_id: this.#player.guildId, url: item, error };
+                    const payload: QueueErrorPayload = { guild_id: this.#player.guildId, url: item.uri, error };
                     this.#player.node.emit(EventName.QueueError, payload);
                     this._onTrackEnd(true);
                 }
@@ -88,6 +93,6 @@ export class Queue {
         const item = this.#tracks.shift();
         if (!item) return;
 
-        await this.#player.play(item, undefined, true);
+        await this.#player.play(item.uri, item.options, true);
     }
 }

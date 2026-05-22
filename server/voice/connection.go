@@ -241,7 +241,7 @@ func (c *Connection) Play(ctx context.Context, source audio.Source) error {
 		oldSource.Close()
 
 		if c.onTrackEnd != nil {
-			go c.onTrackEnd(oldSource, protocol.TrackEndReasonReplaced, nil)
+			c.onTrackEnd(oldSource, protocol.TrackEndReasonReplaced, nil)
 		}
 	}
 

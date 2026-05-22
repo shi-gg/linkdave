@@ -19,6 +19,7 @@ import { unwrap } from "./utils.js";
 export interface PlayOptions {
     startTime?: number;
     volume?: number;
+    requesterId?: string;
 }
 
 export interface PlayerOptions {
@@ -268,7 +269,8 @@ export class Player {
         await this.#node.sendPlay(this.#guildId, {
             url,
             ...(options.startTime !== undefined && { start_time: options.startTime }),
-            ...(options.volume !== undefined && { volume: options.volume })
+            ...(options.volume !== undefined && { volume: options.volume }),
+            ...(options.requesterId !== undefined && { requester_id: options.requesterId })
         });
     }
 
@@ -363,7 +365,7 @@ export class Player {
             this.#current = null;
             this.#state = PlayerState.Idle;
         }
-        this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped);
+        this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped && data.reason !== TrackEndReason.Replaced);
     }
 
     #cleanup() {
@@ -403,18 +405,18 @@ export class Player {
         }
 
         if (data.state === PlayerState.Playing && data.url) {
-            const playData = {
-                url: data.url,
-                start_time: data.position,
-                volume: data.volume
-            };
-
-            // Wait for voice connection on the new node before playing
             const onVoiceConnect = (event: VoiceConnectPayload) => {
                 if (event.guild_id !== this.#guildId) return;
                 this.#node.off(EventName.VoiceConnect, onVoiceConnect);
-                void this.#node.sendPlay(this.#guildId, playData);
+
+                void this.#node.sendPlay(this.#guildId, {
+                    url: data.url,
+                    start_time: data.position,
+                    volume: data.volume,
+                    ...(data.requester_id !== undefined && { requester_id: data.requester_id })
+                });
             };
+
             this.#node.on(EventName.VoiceConnect, onVoiceConnect);
         }
 
