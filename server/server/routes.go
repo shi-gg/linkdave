@@ -94,6 +94,12 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 		return
 	}
 
+	if err := play.Filters.Validate(); err != nil {
+		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: err.Error()})
+		return
+	}
+	play.Filters = play.Filters.Normalize()
+
 	if play.Volume > 0 {
 		player.SetVolume(play.Volume)
 	}

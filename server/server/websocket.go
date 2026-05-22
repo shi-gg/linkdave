@@ -300,6 +300,7 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 	}
 
 	url, position, volume, state, requesterID, filters := player.GetMigrateData()
+	filters = filters.Normalize()
 	client.send(protocol.Message{
 		Op: protocol.OpMigrateReady,
 		Data: protocol.MigrateReadyData{

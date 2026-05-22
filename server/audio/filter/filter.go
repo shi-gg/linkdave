@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -13,6 +14,7 @@ const (
 	Tremolo
 	Vibrato
 	LowPass
+	typeMax
 )
 
 type Filters struct {
@@ -57,6 +59,25 @@ func (f *Filters) hasFilter(ft Type) bool {
 
 func (f *Filters) IsEmpty() bool {
 	return f == nil || (len(f.Enabled) == 0 && f.Pitch <= 0 && f.Speed <= 0)
+}
+
+func (f *Filters) Validate() error {
+	if f == nil {
+		return nil
+	}
+	for _, ft := range f.Enabled {
+		if ft >= typeMax {
+			return fmt.Errorf("unknown filter type: %d", ft)
+		}
+	}
+	return nil
+}
+
+func (f *Filters) Normalize() *Filters {
+	if f == nil || f.IsEmpty() {
+		return nil
+	}
+	return f
 }
 
 type Processor struct {

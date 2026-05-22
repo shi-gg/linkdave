@@ -261,7 +261,7 @@ func (p *Player) SetPlayingState(url string, position int64, requesterID string,
 	p.position = position
 	p.startedAt = time.Now()
 	p.requesterID = requesterID
-	p.filters = filters
+	p.filters = filters.Normalize()
 	p.mutex.Unlock()
 }
 
