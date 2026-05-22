@@ -115,6 +115,7 @@ func (p *Processor) Process(samples []int16) {
 			samples[i*2+1] = clampInt16(r)
 			p.tremoloPhase += phaseInc
 		}
+		p.tremoloPhase = math.Mod(p.tremoloPhase, 2*math.Pi)
 	}
 
 	if p.filters.hasFilter(Vibrato) {
@@ -156,6 +157,7 @@ func (p *Processor) Process(samples []int16) {
 
 			p.vibratoPhase += phaseInc
 		}
+		p.vibratoPhase = math.Mod(p.vibratoPhase, 2*math.Pi)
 	}
 
 	if p.filters.hasFilter(Rotation) {
@@ -175,6 +177,7 @@ func (p *Processor) Process(samples []int16) {
 
 			p.rotationPhase += phaseInc
 		}
+		p.rotationPhase = math.Mod(p.rotationPhase, 2*math.Pi)
 	}
 
 	if p.filters.hasFilter(LowPass) {

@@ -276,8 +276,13 @@ func NewMP3SourceFromReader(reader io.ReadCloser, url string, startTimeMs int64,
 
 	inputSamplesPerChannel := int(float64(OPUS_FRAME_SIZE) / effectiveResampleRatio)
 
+	const maxInputSamples = OPUS_FRAME_SIZE * 4
+
 	if inputSamplesPerChannel < 1 {
 		inputSamplesPerChannel = 1
+	}
+	if inputSamplesPerChannel > maxInputSamples {
+		inputSamplesPerChannel = maxInputSamples
 	}
 
 	inputFrameBytes := inputSamplesPerChannel * srcChannels * 2
