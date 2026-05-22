@@ -88,6 +88,10 @@ discord.on(Events.MessageCreate, async (msg) => {
                 void msg.reply("Unknown filter. Try: Nightcore, Vaporwave, Tremolo, Vibrato, Rotation, LowPass");
                 return;
             }
+            if (!args[1]) {
+                void msg.reply("Usage: !play-filter <filter> <url>");
+                return;
+            }
             player.queue.add(args[1], { filters });
             if (!player.playing) await player.queue.start();
             break;
@@ -95,6 +99,10 @@ discord.on(Events.MessageCreate, async (msg) => {
         case "!play-now": {
             const filters = parseFilters(args);
             const url = filters ? args[1] : args[0];
+            if (!url) {
+                void msg.reply("Usage: !play-now [filter] <url>");
+                return;
+            }
             await player.play(url, filters ? { filters } : {});
             break;
         }
