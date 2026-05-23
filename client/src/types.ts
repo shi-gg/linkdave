@@ -152,7 +152,8 @@ export interface QueueErrorPayload {
 export enum DisconnectReason {
     ConnectionLost = "connection_lost",
     ConnectionFailed = "connection_failed",
-    Requested = "requested"
+    Requested = "requested",
+    Inactivity = "inactivity"
 }
 
 export interface VoiceConnectPayload {
