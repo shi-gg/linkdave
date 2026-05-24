@@ -281,6 +281,9 @@ func (p *Player) SetPausedState(position int64) {
 func (p *Player) GetMigrateData() (url string, position int64, state string, requesterID string, filters *filter.Filters) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	calculatedPos := time.Since(p.startedAt).Milliseconds() + p.position
+	calculatedPos := p.position
+	if p.state == protocol.PlayerStatePlaying {
+		calculatedPos = time.Since(p.startedAt).Milliseconds() + p.position
+	}
 	return p.currentURL, calculatedPos, p.state, p.requesterID, p.filters
 }
