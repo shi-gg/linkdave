@@ -42,8 +42,6 @@ export interface Node {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node extends EventEmitter {
-    private static readonly NODE_PING_INTERVAL = 30_000;
-
     readonly name: string;
     readonly url: string;
     readonly rest: RESTClient;
@@ -53,7 +51,6 @@ export class Node extends EventEmitter {
     #sessionId: string | null = null;
     #reconnectAttempts = 0;
     #reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-    #pingInterval: ReturnType<typeof setInterval> | null = null;
     #state: NodeState = NodeState.Disconnected;
     #playerCount = 0;
 
@@ -92,7 +89,6 @@ export class Node extends EventEmitter {
             const onOpen = () => {
                 this.#state = NodeState.Connected;
                 this.#reconnectAttempts = 0;
-                this.#startPingInterval();
                 resolve(null);
             };
 
@@ -113,7 +109,6 @@ export class Node extends EventEmitter {
     disconnect() {
         this.#state = NodeState.Disconnected;
 
-        this.#stopPingInterval();
         this.#stopReconnect();
 
         if (this.#ws) {
@@ -187,9 +182,6 @@ export class Node extends EventEmitter {
             case ServerOpCodes.VoiceDisconnect:
                 this.emit(EventName.VoiceDisconnect, message.d);
                 break;
-            case ServerOpCodes.Pong:
-                this.emit(EventName.Pong, undefined);
-                break;
             case ServerOpCodes.Stats:
                 this.#playerCount = message.d.players;
                 this.#state = message.d.draining ? NodeState.Draining : NodeState.Connected;
@@ -207,7 +199,6 @@ export class Node extends EventEmitter {
 
     #onClose(event: CloseEvent) {
         this.#state = NodeState.Disconnected;
-        this.#stopPingInterval();
 
         this.emit(EventName.Close, { code: event.code, reason: event.reason });
 
@@ -234,20 +225,6 @@ export class Node extends EventEmitter {
             this.#reconnectTimeout = null;
         }
         this.#reconnectAttempts = 0;
-    }
-
-    #startPingInterval() {
-        this.#pingInterval = setInterval(
-            () => this.#send(ClientOpCodes.Ping, undefined),
-            Node.NODE_PING_INTERVAL
-        );
-    }
-
-    #stopPingInterval() {
-        if (!this.#pingInterval) return;
-
-        clearInterval(this.#pingInterval);
-        this.#pingInterval = null;
     }
 
     sendVoiceUpdate(data: VoiceUpdatePayload) {

@@ -228,8 +228,6 @@ func (s *Server) handleMessage(client *Client, msgType int, data []byte) {
 	switch msg.Op {
 	case protocol.OpVoiceUpdate:
 		s.handleVoiceUpdate(client, msg.Data)
-	case protocol.OpPing:
-		s.handlePing(client)
 	case protocol.OpPlayerMigrate:
 		s.handlePlayerMigrate(client, msg.Data)
 	default:
@@ -276,13 +274,6 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 			GuildID:   update.GuildID,
 			ChannelID: update.ChannelID,
 		},
-	})
-}
-
-func (s *Server) handlePing(client *Client) {
-	client.send(protocol.Message{
-		Op:   protocol.OpPong,
-		Data: nil,
 	})
 }
 
