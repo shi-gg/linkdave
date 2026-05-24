@@ -284,6 +284,7 @@ export class Player {
     async stop() {
         this.#queue._deactivate();
         await this.#node.sendStop(this.#guildId);
+        this.#state = PlayerState.Idle;
         this.#current = null;
     }
 
@@ -360,6 +361,7 @@ export class Player {
     }
 
     _onVoiceConnect() {
+        if (this.#state !== PlayerState.Connecting) return;
         this.#state = PlayerState.Idle;
     }
 
