@@ -1,23 +1,21 @@
 import type { Node } from "./node.js";
 
 export enum ClientOpCodes {
-    Ping = 0,
-    VoiceUpdate = 1,
-    PlayerMigrate = 2
+    VoiceUpdate = 0,
+    PlayerMigrate = 1
 }
 
 export enum ServerOpCodes {
-    Pong = 0,
-    Ready = 1,
-    VoiceConnect = 2,
-    VoiceDisconnect = 3,
-    PlayerUpdate = 4,
-    TrackStart = 5,
-    TrackEnd = 6,
-    TrackError = 7,
-    Stats = 8,
-    NodeDraining = 9,
-    MigrateReady = 10
+    Ready = 0,
+    VoiceConnect = 1,
+    VoiceDisconnect = 2,
+    PlayerUpdate = 3,
+    TrackStart = 4,
+    TrackEnd = 5,
+    TrackError = 6,
+    Stats = 7,
+    NodeDraining = 8,
+    MigrateReady = 9
 }
 
 export enum TrackEndReason {
@@ -63,14 +61,12 @@ export type ServerMessage =
     | { op: ServerOpCodes.TrackError; d: TrackErrorPayload; }
     | { op: ServerOpCodes.VoiceConnect; d: VoiceConnectPayload; }
     | { op: ServerOpCodes.VoiceDisconnect; d: VoiceDisconnectPayload; }
-    | { op: ServerOpCodes.Pong; d?: undefined; }
     | { op: ServerOpCodes.Stats; d: StatsPayload; }
     | { op: ServerOpCodes.NodeDraining; d: NodeDrainingPayload; }
     | { op: ServerOpCodes.MigrateReady; d: MigrateReadyPayload; };
 
 export type ClientMessage =
     | { op: ClientOpCodes.VoiceUpdate; d: VoiceUpdatePayload; }
-    | { op: ClientOpCodes.Ping; d?: undefined; }
     | { op: ClientOpCodes.PlayerMigrate; d: PlayerMigratePayload; };
 
 export interface VoiceServerEvent {
@@ -199,7 +195,6 @@ export enum EventName {
     VoiceConnect = "voiceConnect",
     VoiceDisconnect = "voiceDisconnect",
 
-    Pong = "pong",
     Stats = "stats",
 
     NodeDraining = "nodeDraining",
@@ -218,7 +213,6 @@ export interface Events {
     [EventName.QueueError]: QueueErrorPayload;
     [EventName.VoiceConnect]: VoiceConnectPayload;
     [EventName.VoiceDisconnect]: VoiceDisconnectPayload;
-    [EventName.Pong]: undefined;
     [EventName.Stats]: StatsPayload;
     [EventName.NodeDraining]: NodeDrainingPayload;
     [EventName.MigrateReady]: MigrateReadyPayload;
