@@ -120,7 +120,6 @@ discord.on(Events.MessageCreate, async (msg) => {
         case "!resume": await player.resume(); break;
         case "!stop": await player.stop(); break;
         case "!leave": await player.destroy(); break;
-        case "!volume": await player.setVolume(parseInt(args[0], 10) * 10); break;
         case "!get-channel": await msg.reply(`Current channel: <#${player.voiceChannelId}>`); break;
         case "!current-track": await msg.reply(`Current track: ${player.current?.url}`); break;
         case "!set-filter": {
