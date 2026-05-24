@@ -13,6 +13,7 @@ import type {
     PlayerUpdatePayload,
     TrackEndPayload,
     TrackStartPayload,
+    VoiceConnectPayload,
     VoiceDisconnectPayload
 } from "./types.js";
 import {
@@ -195,15 +196,13 @@ export class LinkDaveClient extends EventEmitter {
     #setupNodeListeners(node: Node) {
         node.on(EventName.Ready, (data) => this.emit(EventName.Ready, data));
         node.on(EventName.PlayerUpdate, (data) => this.#handlePlayerUpdate(node, data));
-
         node.on(EventName.TrackStart, (data) => this.#handleTrackStart(node, data));
         node.on(EventName.TrackEnd, (data) => this.#handleTrackEnd(node, data));
         node.on(EventName.TrackError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.TrackError, data));
         node.on(EventName.QueueError, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.QueueError, data));
-        node.on(EventName.VoiceConnect, (data) => this.#forwardPlayerEvent(node, data.guild_id, EventName.VoiceConnect, data));
+        node.on(EventName.VoiceConnect, (data) => this.#handleVoiceConnect(node, data));
         node.on(EventName.VoiceDisconnect, (data) => this.#handleVoiceDisconnect(node, data));
 
-        node.on(EventName.Pong, () => this.emit(EventName.Pong, undefined));
         node.on(EventName.Stats, (data) => this.emit(EventName.Stats, data));
 
         node.on(EventName.NodeDraining, (data) => this.#handleNodeDraining(node, data));
@@ -229,7 +228,7 @@ export class LinkDaveClient extends EventEmitter {
         const player = this.#players.get(data.guild_id);
         if (player?.node !== node) return;
 
-        player._updateState(data);
+        player._onPlayerUpdate(data);
         this.emit(EventName.PlayerUpdate, data);
     }
 
@@ -247,6 +246,14 @@ export class LinkDaveClient extends EventEmitter {
 
         player._onTrackEnd(data);
         this.emit(EventName.TrackEnd, data);
+    }
+
+    #handleVoiceConnect(node: Node, data: VoiceConnectPayload) {
+        const player = this.#players.get(data.guild_id);
+        if (player?.node !== node) return;
+
+        player._onVoiceConnect();
+        this.emit(EventName.VoiceConnect, data);
     }
 
     #handleVoiceDisconnect(node: Node, data: VoiceDisconnectPayload) {

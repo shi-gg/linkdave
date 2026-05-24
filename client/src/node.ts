@@ -6,8 +6,7 @@ import type {
     PlayPayload,
     SeekPayload,
     ServerMessage,
-    VoiceUpdatePayload,
-    VolumePayload
+    VoiceUpdatePayload
 } from "./types.js";
 import {
     ClientOpCodes,
@@ -277,10 +276,6 @@ export class Node extends EventEmitter {
 
     async sendSeek(guildId: string, data: SeekPayload) {
         await this.rest.post(Routes.seek(this.#requireSession(), guildId), data);
-    }
-
-    async sendVolume(guildId: string, data: VolumePayload) {
-        await this.rest.patch(Routes.volume(this.#requireSession(), guildId), data);
     }
 
     async sendDisconnect(guildId: string) {
