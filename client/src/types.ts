@@ -90,7 +90,6 @@ export interface VoiceUpdatePayload {
 export interface PlayPayload {
     url: string;
     start_time?: number;
-    volume?: number;
     requester_id?: string;
     filters?: FiltersPayload;
 }
@@ -103,10 +102,6 @@ export interface SeekPayload {
     position: number;
 }
 
-export interface VolumePayload {
-    volume: number;
-}
-
 export interface ReadyPayload {
     session_id: string;
     resumed: boolean;
@@ -115,8 +110,6 @@ export interface ReadyPayload {
 export interface PlayerUpdatePayload {
     guild_id: string;
     state: PlayerState;
-    position: number;
-    volume: number;
 }
 
 export interface TrackInfo {
@@ -186,7 +179,6 @@ export interface MigrateReadyPayload {
     guild_id: string;
     url: string;
     position: number;
-    volume: number;
     state: PlayerState;
     requester_id?: string;
     filters?: FiltersPayload;
@@ -258,6 +250,5 @@ export const Routes = {
     resume: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/resume` as const,
     stop: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/stop` as const,
     seek: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/seek` as const,
-    volume: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}/volume` as const,
     disconnect: (sessionId: string, guildId: string) => `/sessions/${sessionId}/players/${guildId}` as const
 } as const;

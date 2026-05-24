@@ -299,7 +299,7 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 		return
 	}
 
-	url, position, volume, state, requesterID, filters := player.GetMigrateData()
+	url, position, state, requesterID, filters := player.GetMigrateData()
 	filters = filters.Normalize()
 	client.send(protocol.Message{
 		Op: protocol.OpMigrateReady,
@@ -307,7 +307,6 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 			GuildID:     migrate.GuildID,
 			URL:         url,
 			Position:    position,
-			Volume:      volume,
 			State:       state,
 			RequesterID: requesterID,
 			Filters:     filters,
