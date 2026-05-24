@@ -72,18 +72,9 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	if c.setupCancel != nil {
 		c.setupCancel()
 	}
-	oldConn := c.voiceConn
 	c.voiceConn = nil
 	c.connectedUsers.Store(0)
 	c.mutex.Unlock()
-
-	if oldConn != nil {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			oldConn.Close(ctx)
-		}()
-	}
 
 	c.setupMu.Lock()
 	defer c.setupMu.Unlock()
@@ -118,7 +109,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		func() {
 			c.logger.Debug("voice connection removed from manager")
 
-			if c.closed.Load() || c.onDisconnect == nil {
+			if c.closed.Load() {
 				return
 			}
 
@@ -128,13 +119,22 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 				return
 			}
 
-			isCurrent := c.voiceConn == currentVoiceConn
-			isTarget := c.targetVoiceConn == currentVoiceConn
+			vc := currentVoiceConn
+			isCurrent := c.voiceConn == vc
+			isTarget := c.targetVoiceConn == vc
 			c.mutex.Unlock()
 
-			if isCurrent || isTarget {
-				c.Stop()
-				c.onDisconnect()
+			if isCurrent {
+				c.safeSetOpusFrameProvider(vc, nil)
+				c.mutex.Lock()
+				if c.voiceConn == vc {
+					c.voiceConn = nil
+				}
+				c.mutex.Unlock()
+			} else if isTarget {
+				c.mutex.Lock()
+				c.targetVoiceConn = nil
+				c.mutex.Unlock()
 			}
 		},
 		voice.WithConnLogger(c.logger),
