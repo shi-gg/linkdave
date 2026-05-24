@@ -228,8 +228,6 @@ func (s *Server) handleMessage(client *Client, msgType int, data []byte) {
 	switch msg.Op {
 	case protocol.OpVoiceUpdate:
 		s.handleVoiceUpdate(client, msg.Data)
-	case protocol.OpPing:
-		s.handlePing(client)
 	case protocol.OpPlayerMigrate:
 		s.handlePlayerMigrate(client, msg.Data)
 	default:
@@ -279,13 +277,6 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 	})
 }
 
-func (s *Server) handlePing(client *Client) {
-	client.send(protocol.Message{
-		Op:   protocol.OpPong,
-		Data: nil,
-	})
-}
-
 func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 	var migrate protocol.PlayerMigrateData
 	if err := json.Unmarshal(data, &migrate); err != nil {
@@ -299,7 +290,7 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 		return
 	}
 
-	url, position, volume, state, requesterID, filters := player.GetMigrateData()
+	url, position, state, requesterID, filters := player.GetMigrateData()
 	filters = filters.Normalize()
 	client.send(protocol.Message{
 		Op: protocol.OpMigrateReady,
@@ -307,7 +298,6 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 			GuildID:     migrate.GuildID,
 			URL:         url,
 			Position:    position,
-			Volume:      volume,
 			State:       state,
 			RequesterID: requesterID,
 			Filters:     filters,

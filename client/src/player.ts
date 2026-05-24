@@ -20,7 +20,6 @@ import { unwrap } from "./utils.js";
 
 export interface PlayOptions {
     startTime?: number;
-    volume?: number;
     requesterId?: string;
     filters?: FiltersPayload;
 }
@@ -59,8 +58,7 @@ export class Player {
     #selfMute: boolean;
     #selfDeaf: boolean;
     #state: PlayerState = PlayerState.Idle;
-    #position = 0;
-    #volume = 100;
+
     #current: TrackInfo | null = null;
     #voiceState: VoiceState | null = null;
     #pendingVoice: PendingVoiceState | null = null;
@@ -87,14 +85,6 @@ export class Player {
 
     get state() {
         return this.#state;
-    }
-
-    get position() {
-        return this.#position;
-    }
-
-    get volume() {
-        return this.#volume;
     }
 
     get current() {
@@ -278,7 +268,6 @@ export class Player {
         await this.#node.sendPlay(this.#guildId, {
             url,
             ...(options.startTime !== undefined && { start_time: options.startTime }),
-            ...(options.volume !== undefined && { volume: options.volume }),
             ...(options.requesterId !== undefined && { requester_id: options.requesterId }),
             ...(filters !== undefined && { filters })
         });
@@ -295,18 +284,12 @@ export class Player {
     async stop() {
         this.#queue._deactivate();
         await this.#node.sendStop(this.#guildId);
-        this.#current = null;
         this.#state = PlayerState.Idle;
-        this.#position = 0;
+        this.#current = null;
     }
 
     async seek(position: number) {
         await this.#node.sendSeek(this.#guildId, { position });
-    }
-
-    async setVolume(volume: number) {
-        this.#volume = Math.max(0, Math.min(1_000, volume));
-        await this.#node.sendVolume(this.#guildId, { volume: this.#volume });
     }
 
     async destroy() {
@@ -360,14 +343,13 @@ export class Player {
         });
     }
 
-    _updateState(data: PlayerUpdatePayload) {
+    _onPlayerUpdate(data: PlayerUpdatePayload) {
         this.#state = data.state;
-        this.#position = data.position;
-        this.#volume = data.volume;
     }
 
     _onTrackStart(data: TrackStartPayload) {
         this.#current = data.track;
+        this.#state = PlayerState.Playing;
     }
 
     _onTrackEnd(data: TrackEndPayload) {
@@ -378,6 +360,11 @@ export class Player {
         this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped && data.reason !== TrackEndReason.Replaced);
     }
 
+    _onVoiceConnect() {
+        if (this.#state !== PlayerState.Connecting) return;
+        this.#state = PlayerState.Idle;
+    }
+
     #cleanup() {
         this.#voiceChannelId = null;
         this.#queue._deactivate();
@@ -385,7 +372,6 @@ export class Player {
         this.#pendingVoice = null;
         this.#state = PlayerState.Idle;
         this.#current = null;
-        this.#position = 0;
     }
 
     _onVoiceDisconnect() {
@@ -422,7 +408,6 @@ export class Player {
                 void this.#node.sendPlay(this.#guildId, {
                     url: data.url,
                     start_time: data.position,
-                    volume: data.volume,
                     ...(data.requester_id !== undefined && { requester_id: data.requester_id }),
                     ...(data.filters !== undefined && { filters: data.filters })
                 });

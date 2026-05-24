@@ -27,7 +27,6 @@ type Player struct {
 	state       string
 	currentURL  string
 	position    int64
-	volume      int
 	startedAt   time.Time
 	requesterID string
 	filters     *filter.Filters
@@ -150,7 +149,6 @@ func (c *Client) getOrCreatePlayer(guildID snowflake.ID) *Player {
 	player := &Player{
 		guildID: guildID,
 		state:   protocol.PlayerStateIdle,
-		volume:  100,
 	}
 	c.players[guildID] = player
 	return player
@@ -218,18 +216,6 @@ func (p *Player) SetPosition(pos int64) {
 	p.mutex.Unlock()
 }
 
-func (p *Player) GetVolume() int {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	return p.volume
-}
-
-func (p *Player) SetVolume(vol int) {
-	p.mutex.Lock()
-	p.volume = vol
-	p.mutex.Unlock()
-}
-
 func (p *Player) GetStartedAt() time.Time {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -292,15 +278,12 @@ func (p *Player) SetPausedState(position int64) {
 	p.mutex.Unlock()
 }
 
-func (p *Player) GetPlayerUpdateData() (state string, position int64, volume int) {
+func (p *Player) GetMigrateData() (url string, position int64, state string, requesterID string, filters *filter.Filters) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	return p.state, p.position, p.volume
-}
-
-func (p *Player) GetMigrateData() (url string, position int64, volume int, state string, requesterID string, filters *filter.Filters) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	calculatedPos := time.Since(p.startedAt).Milliseconds() + p.position
-	return p.currentURL, calculatedPos, p.volume, p.state, p.requesterID, p.filters
+	calculatedPos := p.position
+	if p.state == protocol.PlayerStatePlaying {
+		calculatedPos = time.Since(p.startedAt).Milliseconds() + p.position
+	}
+	return p.currentURL, calculatedPos, p.state, p.requesterID, p.filters
 }

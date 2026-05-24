@@ -23,7 +23,6 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/resume", s.withSession(s.routeResume))
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/stop", s.withSession(s.routeStop))
 	mux.HandleFunc("POST /sessions/{session_id}/players/{guild_id}/seek", s.withSession(s.routeSeek))
-	mux.HandleFunc("PATCH /sessions/{session_id}/players/{guild_id}/volume", s.withSession(s.routeVolume))
 	mux.HandleFunc("DELETE /sessions/{session_id}/players/{guild_id}", s.withSession(s.routeDisconnect))
 }
 
@@ -100,10 +99,6 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 	}
 	play.Filters = play.Filters.Normalize()
 
-	if play.Volume > 0 {
-		player.SetVolume(play.Volume)
-	}
-
 	s.logger.Info("play requested",
 		slog.String("guild_id", guildID.String()),
 		slog.String("url", play.URL),
@@ -118,7 +113,6 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 
 	player.SetPlayingState(play.URL, play.StartTime, play.RequesterID, play.Filters)
 
-	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpTrackStart,
 		Data: protocol.TrackStartData{
@@ -128,16 +122,6 @@ func (s *Server) routePlay(client *Client, guildID snowflake.ID, w http.Response
 				Duration:    source.Duration(),
 				RequesterID: play.RequesterID,
 			},
-		},
-	})
-
-	client.send(protocol.Message{
-		Op: protocol.OpPlayerUpdate,
-		Data: protocol.PlayerUpdateData{
-			GuildID:  guildID,
-			State:    state,
-			Position: position,
-			Volume:   volume,
 		},
 	})
 
@@ -159,14 +143,11 @@ func (s *Server) routePause(client *Client, guildID snowflake.ID, w http.Respons
 
 	player.SetPausedState(s.voiceManager.Position(client.sessionID, guildID))
 
-	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
-			GuildID:  guildID,
-			State:    state,
-			Position: position,
-			Volume:   volume,
+			GuildID: guildID,
+			State:   player.GetState(),
 		},
 	})
 
@@ -190,14 +171,11 @@ func (s *Server) routeResume(client *Client, guildID snowflake.ID, w http.Respon
 	player.SetStartedAt(time.Now())
 	player.SetPosition(s.voiceManager.Position(client.sessionID, guildID))
 
-	state, position, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
-			GuildID:  guildID,
-			State:    state,
-			Position: position,
-			Volume:   volume,
+			GuildID: guildID,
+			State:   player.GetState(),
 		},
 	})
 
@@ -219,14 +197,11 @@ func (s *Server) routeStop(client *Client, guildID snowflake.ID, w http.Response
 
 	player.SetIdleState()
 
-	state, _, volume := player.GetPlayerUpdateData()
 	client.send(protocol.Message{
 		Op: protocol.OpPlayerUpdate,
 		Data: protocol.PlayerUpdateData{
-			GuildID:  guildID,
-			State:    state,
-			Position: 0,
-			Volume:   volume,
+			GuildID: guildID,
+			State:   player.GetState(),
 		},
 	})
 
@@ -260,46 +235,6 @@ func (s *Server) routeSeek(client *Client, guildID snowflake.ID, w http.Response
 
 	player.SetPosition(s.voiceManager.Position(client.sessionID, guildID))
 	player.SetStartedAt(time.Now())
-
-	state, position, volume := player.GetPlayerUpdateData()
-	client.send(protocol.Message{
-		Op: protocol.OpPlayerUpdate,
-		Data: protocol.PlayerUpdateData{
-			GuildID:  guildID,
-			State:    state,
-			Position: position,
-			Volume:   volume,
-		},
-	})
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Server) routeVolume(client *Client, guildID snowflake.ID, w http.ResponseWriter, r *http.Request) {
-	var vol protocol.RequestVolume
-	if err := json.NewDecoder(r.Body).Decode(&vol); err != nil {
-		writeJSON(w, http.StatusBadRequest, protocol.ErrorResponse{Error: "invalid request body"})
-		return
-	}
-
-	player := client.getPlayer(guildID)
-	if player == nil {
-		writeJSON(w, http.StatusNotFound, protocol.ErrorResponse{Error: "player not found"})
-		return
-	}
-
-	player.SetVolume(vol.Volume)
-
-	state, _, volume := player.GetPlayerUpdateData()
-	client.send(protocol.Message{
-		Op: protocol.OpPlayerUpdate,
-		Data: protocol.PlayerUpdateData{
-			GuildID:  guildID,
-			State:    state,
-			Position: s.voiceManager.Position(client.sessionID, guildID),
-			Volume:   volume,
-		},
-	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
