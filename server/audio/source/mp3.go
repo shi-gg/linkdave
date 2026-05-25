@@ -15,9 +15,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/hraban/opus"
 	"github.com/shi-gg/linkdave/server/audio/filter"
 	"github.com/tosone/minimp3"
-	"gopkg.in/hraban/opus.v2"
 )
 
 const (
