@@ -54,6 +54,10 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		tags := make(map[string]string)
 		extra := make(map[string]interface{})
 
+		for _, a := range h.attrs {
+			extractAttr(tags, extra, event, a)
+		}
+
 		r.Attrs(func(a slog.Attr) bool {
 			extractAttr(tags, extra, event, a)
 			return true
@@ -63,9 +67,6 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 			scope.SetTags(tags)
 			if len(extra) > 0 {
 				scope.SetContext("extra", sentry.Context(extra))
-			}
-			if len(event.Exception) > 0 {
-				event.Exception[0].Stacktrace = sentry.NewStacktrace()
 			}
 			sentry.CaptureEvent(event)
 		})
@@ -105,8 +106,9 @@ func extractAttr(tags map[string]string, extra map[string]interface{}, event *se
 	case "error":
 		if err, ok := a.Value.Any().(error); ok {
 			event.Exception = append(event.Exception, sentry.Exception{
-				Type:  "error",
-				Value: err.Error(),
+				Type:       "error",
+				Value:      err.Error(),
+				Stacktrace: sentry.NewStacktrace(),
 			})
 		} else {
 			extra[a.Key] = a.Value.Any()
@@ -117,12 +119,12 @@ func extractAttr(tags map[string]string, extra map[string]interface{}, event *se
 }
 
 func mapLevel(level slog.Level) sentry.Level {
-	switch level {
-	case slog.LevelError:
+	switch {
+	case level >= slog.LevelError:
 		return sentry.LevelError
-	case slog.LevelWarn:
+	case level >= slog.LevelWarn:
 		return sentry.LevelWarning
-	case slog.LevelInfo:
+	case level >= slog.LevelInfo:
 		return sentry.LevelInfo
 	default:
 		return sentry.LevelDebug
