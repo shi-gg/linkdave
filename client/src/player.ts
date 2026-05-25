@@ -372,6 +372,7 @@ export class Player {
     _onVoiceConnect() {
         if (this.#state !== PlayerState.Connecting) return;
         this.#state = PlayerState.Idle;
+        this.#startTimer();
     }
 
     #cleanup() {
