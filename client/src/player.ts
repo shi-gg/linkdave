@@ -28,6 +28,7 @@ export interface PlayerOptions {
     voiceChannelId?: string;
     selfMute?: boolean;
     selfDeaf?: boolean;
+    inactivityTimeout?: number;
 }
 
 export type RawVoiceStateUpdate = Pick<GatewayVoiceStateUpdateDispatchData, "user_id" | "channel_id" | "session_id">;
@@ -64,6 +65,8 @@ export class Player {
     #pendingVoice: PendingVoiceState | null = null;
     #migrationTarget: Node | null = null;
     #migrationResolve: ((value: unknown) => void) | null = null;
+    #inactivityTimeout: number;
+    #inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(client: LinkDaveClient, guildId: string, node: Node, options?: PlayerOptions) {
         this.#client = client;
@@ -73,6 +76,7 @@ export class Player {
         this.#voiceChannelId = options?.voiceChannelId ?? null;
         this.#selfMute = options?.selfMute ?? false;
         this.#selfDeaf = options?.selfDeaf ?? true;
+        this.#inactivityTimeout = options?.inactivityTimeout ?? 0;
     }
 
     get guildId() {
@@ -344,18 +348,23 @@ export class Player {
     }
 
     _onPlayerUpdate(data: PlayerUpdatePayload) {
+        if (data.state === PlayerState.Playing) this.#stopTimer();
+        else if (this.#state === PlayerState.Playing) this.#startTimer();
+
         this.#state = data.state;
     }
 
     _onTrackStart(data: TrackStartPayload) {
         this.#current = data.track;
         this.#state = PlayerState.Playing;
+        this.#stopTimer();
     }
 
     _onTrackEnd(data: TrackEndPayload) {
         if (!this.#queue.active || this.#queue.size === 0) {
-            this.#current = null;
             this.#state = PlayerState.Idle;
+            this.#current = null;
+            this.#startTimer();
         }
         this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped && data.reason !== TrackEndReason.Replaced);
     }
@@ -372,6 +381,7 @@ export class Player {
         this.#pendingVoice = null;
         this.#state = PlayerState.Idle;
         this.#current = null;
+        this.#stopTimer();
     }
 
     _onVoiceDisconnect() {
@@ -422,4 +432,35 @@ export class Player {
         this.#migrationResolve(null);
         this.#migrationResolve = null;
     }
+
+    #startTimer() {
+        if (this.#inactivityTimeout <= 0) return;
+        this.#stopTimer();
+
+        this.#inactivityTimer = setTimeout(
+            () => {
+                if (this.#state === PlayerState.Playing) return;
+                this.disconnect();
+
+                if (this.#node.connected) {
+                    void this.#node.sendDisconnect(this.#guildId);
+                }
+
+                this.#client._onPlayerDestroy(this.#guildId);
+
+                this.#client.emit(EventName.VoiceDisconnect, {
+                    guild_id: this.#guildId,
+                    reason: DisconnectReason.Inactivity
+                });
+            },
+            this.#inactivityTimeout
+        );
+    }
+
+    #stopTimer() {
+        if (this.#inactivityTimer === null) return;
+        clearTimeout(this.#inactivityTimer);
+        this.#inactivityTimer = null;
+    }
+
 }
