@@ -46,29 +46,33 @@ func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	if r.Level >= slog.LevelWarn && sentry.CurrentHub().Client() != nil {
-		event := sentry.NewEvent()
-		event.Message = r.Message
-		event.Level = mapLevel(r.Level)
-		event.Timestamp = r.Time
-
 		tags := make(map[string]string)
 		extra := make(map[string]interface{})
+		var firstErr error
 
 		for _, a := range h.attrs {
-			extractAttr(tags, extra, event, a)
+			extractAttr(tags, extra, &firstErr, a)
 		}
 
 		r.Attrs(func(a slog.Attr) bool {
-			extractAttr(tags, extra, event, a)
+			extractAttr(tags, extra, &firstErr, a)
 			return true
 		})
 
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetTags(tags)
+			scope.SetLevel(mapLevel(r.Level))
+			if firstErr != nil {
+				extra["log_message"] = r.Message
+			}
 			if len(extra) > 0 {
 				scope.SetContext("extra", sentry.Context(extra))
 			}
-			sentry.CaptureEvent(event)
+			if firstErr != nil {
+				sentry.CaptureException(firstErr)
+			} else {
+				sentry.CaptureMessage(r.Message)
+			}
 		})
 	}
 
@@ -91,11 +95,11 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 	}
 }
 
-func extractAttr(tags map[string]string, extra map[string]interface{}, event *sentry.Event, a slog.Attr) {
+func extractAttr(tags map[string]string, extra map[string]interface{}, firstErr *error, a slog.Attr) {
 	a.Value = a.Value.Resolve()
 	if a.Value.Kind() == slog.KindGroup {
 		for _, ga := range a.Value.Group() {
-			extractAttr(tags, extra, event, ga)
+			extractAttr(tags, extra, firstErr, ga)
 		}
 		return
 	}
@@ -105,11 +109,9 @@ func extractAttr(tags map[string]string, extra map[string]interface{}, event *se
 		tags[a.Key] = a.Value.String()
 	case "error":
 		if err, ok := a.Value.Any().(error); ok {
-			event.Exception = append(event.Exception, sentry.Exception{
-				Type:       "error",
-				Value:      err.Error(),
-				Stacktrace: sentry.NewStacktrace(),
-			})
+			if *firstErr == nil {
+				*firstErr = err
+			}
 		} else {
 			extra[a.Key] = a.Value.Any()
 		}
