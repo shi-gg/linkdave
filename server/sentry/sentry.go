@@ -53,13 +53,17 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		tags := make(map[string]string)
 		extra := make(map[string]interface{})
 		var firstErr error
+		prefix := h.group
+		if prefix != "" {
+			prefix += "."
+		}
 
 		for _, a := range h.attrs {
-			extractAttr(tags, extra, &firstErr, "", a)
+			extractAttr(tags, extra, &firstErr, prefix, a)
 		}
 
 		r.Attrs(func(a slog.Attr) bool {
-			extractAttr(tags, extra, &firstErr, "", a)
+			extractAttr(tags, extra, &firstErr, prefix, a)
 			return true
 		})
 
@@ -92,10 +96,19 @@ func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 func (h *Handler) WithGroup(name string) slog.Handler {
+	if name == "" {
+		return h
+	}
+
+	group := name
+	if h.group != "" {
+		group = h.group + "." + name
+	}
+
 	return &Handler{
 		parent: h.parent.WithGroup(name),
 		attrs:  h.attrs,
-		group:  name,
+		group:  group,
 	}
 }
 
