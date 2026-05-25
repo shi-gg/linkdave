@@ -7,9 +7,9 @@
     },
     "dependencies": {
         "linkdave": "file:../client",
-        "discord.js": "^14.26.3"
+        "discord.js": "^14.26.4"
     },
     "devDependencies": {
-        "@types/node": "^25.6.0"
+        "@types/node": "^25.9.1"
     }
 }
