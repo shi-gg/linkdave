@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shi-gg/linkdave/server/audio/source"
+	"github.com/shi-gg/linkdave/server/sentry"
 	"github.com/shi-gg/linkdave/server/server"
 	"github.com/shi-gg/linkdave/server/voice"
 )
@@ -25,10 +26,14 @@ var (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	baseHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
-	}))
+	})
+	logger := slog.New(sentry.NewHandler(baseHandler))
 	slog.SetDefault(logger)
+
+	sentry.Init(os.Getenv("SENTRY_DSN"), version)
+	defer sentry.Flush(2 * time.Second)
 
 	logger.Info("starting linkdave",
 		slog.String("version", version),
