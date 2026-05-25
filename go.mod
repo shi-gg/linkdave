@@ -6,6 +6,7 @@ require (
 	github.com/disgoorg/disgo v0.19.3-0.20260305185833-306575eac91c
 	github.com/disgoorg/godave/golibdave v0.1.0
 	github.com/disgoorg/snowflake/v2 v2.0.3
+	github.com/getsentry/sentry-go v0.46.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/tosone/minimp3 v1.0.2
@@ -21,4 +22,5 @@ require (
 	github.com/sasha-s/go-csync v0.0.0-20240107134140-fcbab37b09ad // indirect
 	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 )
