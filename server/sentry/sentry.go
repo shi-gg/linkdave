@@ -45,21 +45,25 @@ func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
-	if r.Level >= slog.LevelWarn && sentry.CurrentHub().Client() != nil {
+	hub := sentry.GetHubFromContext(ctx)
+	if hub == nil {
+		hub = sentry.CurrentHub()
+	}
+	if r.Level >= slog.LevelWarn && hub != nil && hub.Client() != nil {
 		tags := make(map[string]string)
 		extra := make(map[string]interface{})
 		var firstErr error
 
 		for _, a := range h.attrs {
-			extractAttr(tags, extra, &firstErr, a)
+			extractAttr(tags, extra, &firstErr, "", a)
 		}
 
 		r.Attrs(func(a slog.Attr) bool {
-			extractAttr(tags, extra, &firstErr, a)
+			extractAttr(tags, extra, &firstErr, "", a)
 			return true
 		})
 
-		sentry.WithScope(func(scope *sentry.Scope) {
+		hub.WithScope(func(scope *sentry.Scope) {
 			scope.SetTags(tags)
 			scope.SetLevel(mapLevel(r.Level))
 			if firstErr != nil {
@@ -69,9 +73,9 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 				scope.SetContext("extra", sentry.Context(extra))
 			}
 			if firstErr != nil {
-				sentry.CaptureException(firstErr)
+				hub.CaptureException(firstErr)
 			} else {
-				sentry.CaptureMessage(r.Message)
+				hub.CaptureMessage(r.Message)
 			}
 		})
 	}
@@ -95,28 +99,30 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 	}
 }
 
-func extractAttr(tags map[string]string, extra map[string]interface{}, firstErr *error, a slog.Attr) {
+func extractAttr(tags map[string]string, extra map[string]interface{}, firstErr *error, prefix string, a slog.Attr) {
 	a.Value = a.Value.Resolve()
 	if a.Value.Kind() == slog.KindGroup {
+		groupPrefix := prefix + a.Key + "."
 		for _, ga := range a.Value.Group() {
-			extractAttr(tags, extra, firstErr, ga)
+			extractAttr(tags, extra, firstErr, groupPrefix, ga)
 		}
 		return
 	}
 
+	key := prefix + a.Key
 	switch a.Key {
 	case "guild_id", "session", "client", "version":
-		tags[a.Key] = a.Value.String()
+		tags[key] = a.Value.String()
 	case "error":
 		if err, ok := a.Value.Any().(error); ok {
 			if *firstErr == nil {
 				*firstErr = err
 			}
 		} else {
-			extra[a.Key] = a.Value.Any()
+			extra[key] = a.Value.Any()
 		}
 	default:
-		extra[a.Key] = a.Value.Any()
+		extra[key] = a.Value.Any()
 	}
 }
 
