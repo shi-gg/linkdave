@@ -144,7 +144,7 @@ export class LinkDaveClient extends EventEmitter {
         const node = this.getPreferredNode(options?.nodeId);
         if (!node) {
             throw new Error(options?.nodeId
-                ? `"${options.nodeId}" node is not available to create player`
+                ? `Node "${options.nodeId}" is not available to create player`
                 : "No available nodes to create player"
             );
         }
