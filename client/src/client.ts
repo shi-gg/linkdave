@@ -124,13 +124,29 @@ export class LinkDaveClient extends EventEmitter {
         return bestNode;
     }
 
-    getPlayer(guildId: string, options?: Omit<PlayerOptions, "guildId">) {
+    private getPreferredNode(nodeId?: string) {
+        if (!nodeId) {
+            return this.getBestNode();
+        }
+
+        const node = this.#nodes.get(nodeId);
+        if (!node || !node.connected || node.draining) {
+            return undefined;
+        }
+
+        return node;
+    }
+
+    getPlayer(guildId: string, options?: Omit<PlayerOptions, "guildId"> & { nodeId?: string; }) {
         let player = this.#players.get(guildId);
         if (player) return player;
 
-        const node = this.getBestNode();
+        const node = this.getPreferredNode(options?.nodeId);
         if (!node) {
-            throw new Error("No available nodes to create player");
+            throw new Error(options?.nodeId
+                ? `Node "${options.nodeId}" is not available to create player`
+                : "No available nodes to create player"
+            );
         }
 
         player = new Player(this, guildId, node, options);
