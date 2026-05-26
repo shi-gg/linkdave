@@ -317,8 +317,6 @@ func (s *Server) handlePlayerMigrate(client *Client, data json.RawMessage) {
 func (s *Server) GetStats() protocol.StatsData {
 	s.clientsMu.RLock()
 	defer s.clientsMu.RUnlock()
-	s.drainMu.RLock()
-	defer s.drainMu.RUnlock()
 
 	var totalPlayers, playingTracks int
 	for _, client := range s.clients {
