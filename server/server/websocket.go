@@ -340,7 +340,6 @@ func (s *Server) GetStats() protocol.StatsData {
 		PlayingTracks: playingTracks,
 		Uptime:        time.Since(s.startTime).Milliseconds(),
 		Memory:        m.Alloc,
-		Draining:      s.draining,
 	}
 }
 

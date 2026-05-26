@@ -6,6 +6,7 @@ import type {
     PlayPayload,
     SeekPayload,
     ServerMessage,
+    StatsPayload,
     VoiceUpdatePayload
 } from "./types.js";
 import {
@@ -52,7 +53,7 @@ export class Node extends EventEmitter {
     #reconnectAttempts = 0;
     #reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     #state: NodeState = NodeState.Disconnected;
-    #playerCount = 0;
+    #stats: StatsPayload = { players: 0, playing_tracks: 0, uptime: 0, memory: 0 };
 
     constructor(options: NodeOptions) {
         super();
@@ -127,8 +128,8 @@ export class Node extends EventEmitter {
         return this.#sessionId;
     }
 
-    get playerCount() {
-        return this.#playerCount;
+    get stats() {
+        return this.#stats;
     }
 
     get draining() {
@@ -140,13 +141,12 @@ export class Node extends EventEmitter {
     }
 
     incrementPlayerCount() {
-        this.#playerCount++;
+        this.#stats.players++;
     }
 
     decrementPlayerCount() {
-        if (this.#playerCount > 0) {
-            this.#playerCount--;
-        }
+        if (this.#stats.players <= 0) return;
+        this.#stats.players--;
     }
 
     #onMessage(event: MessageEvent) {
@@ -183,8 +183,7 @@ export class Node extends EventEmitter {
                 this.emit(EventName.VoiceDisconnect, message.d);
                 break;
             case ServerOpCodes.Stats:
-                this.#playerCount = message.d.players;
-                this.#state = message.d.draining ? NodeState.Draining : NodeState.Connected;
+                this.#stats = message.d;
                 this.emit(EventName.Stats, message.d);
                 break;
             case ServerOpCodes.NodeDraining:

@@ -115,8 +115,8 @@ export class LinkDaveClient extends EventEmitter {
                 continue;
             }
 
-            if (node.playerCount < lowestCount) {
-                lowestCount = node.playerCount;
+            if (node.stats.players < lowestCount) {
+                lowestCount = node.stats.players;
                 bestNode = node;
             }
         }

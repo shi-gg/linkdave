@@ -92,7 +92,6 @@ type StatsData struct {
 	PlayingTracks int    `json:"playing_tracks"`
 	Uptime        int64  `json:"uptime"`
 	Memory        uint64 `json:"memory"`
-	Draining      bool   `json:"draining"`
 }
 
 type NodeDrainingData struct {

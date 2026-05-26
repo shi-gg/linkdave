@@ -160,7 +160,6 @@ export interface StatsPayload {
     playing_tracks: number;
     uptime: number;
     memory: number;
-    draining: boolean;
 }
 
 export interface PlayerMigratePayload {
