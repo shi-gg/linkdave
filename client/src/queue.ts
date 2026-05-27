@@ -1,5 +1,5 @@
 import type { Player, PlayOptions } from "./player.js";
-import { EventName, type QueueErrorPayload } from "./types.js";
+import { EventName } from "./types.js";
 
 export interface QueueItem {
     uri: string;
