@@ -1,5 +1,5 @@
 import type { Player, PlayOptions } from "./player.js";
-import { EventName, type QueueErrorPayload } from "./types.js";
+import { EventName } from "./types.js";
 
 export interface QueueItem {
     uri: string;
@@ -76,10 +76,9 @@ export class Queue {
             .play(item.uri, item.options, true)
             .then(
                 () => null,
-                (error_: unknown) => {
-                    const error = error_ instanceof Error ? error_ : new Error(String(error_));
-                    const payload: QueueErrorPayload = { guild_id: this.#player.guildId, url: item.uri, error };
-                    this.#player.node.emit(EventName.QueueError, payload);
+                (error: unknown) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    this.#player.node.emit(EventName.QueueError, { guild_id: this.#player.guildId, item, error: message });
                     this._onTrackEnd(true);
                 }
             );

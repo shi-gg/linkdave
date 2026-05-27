@@ -1,4 +1,5 @@
 import type { Node } from "./node.js";
+import type { QueueItem } from "./queue.js";
 
 export enum ClientOpCodes {
     VoiceUpdate = 0,
@@ -134,8 +135,8 @@ export interface TrackErrorPayload {
 
 export interface QueueErrorPayload {
     guild_id: string;
-    url: string;
-    error: Error;
+    item: QueueItem;
+    error: string;
 }
 
 export enum DisconnectReason {
