@@ -264,7 +264,13 @@ export class Player {
 
     async play(url: string, options: PlayOptions = {}, isFromQueue = false) {
         if (!isFromQueue) this.#queue._deactivate();
-        await this.#sendPlay(url, options);
+
+        const [, error] = await unwrap(this.#sendPlay(url, options));
+        if (error) {
+            this.#state = PlayerState.Idle;
+            this.#current = null;
+            throw error;
+        }
     }
 
     async #sendPlay(url: string, options: PlayOptions = {}) {
