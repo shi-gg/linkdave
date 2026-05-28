@@ -12,6 +12,7 @@ type Config struct {
 	PrivateIPAddressEnabled bool
 	TextToSpeechEnabled     bool
 	TextToSpeechURL         string
+	TextToSpeechToken       string
 	UserAgent               string
 }
 
@@ -25,6 +26,8 @@ func init() {
 		PrivateIPAddressEnabled: getEnvBool("LINKDAVE_SOURCE_IP_ADDRESS_PRIVATE_ENABLED", false),
 		TextToSpeechEnabled:     getEnvBool("LINKDAVE_SOURCE_TEXT_TO_SPEECH_ENABLED", false),
 		TextToSpeechURL:         getEnvString("LINKDAVE_SOURCE_TEXT_TO_SPEECH_URL", "https://tts.wamellow.com/api/invoke"),
+		TextToSpeechToken:       getEnvString("LINKDAVE_SOURCE_TEXT_TO_SPEECH_TOKEN", ""),
+		UserAgent:               "Linkdave/v0.0.0",
 	}
 }
 
