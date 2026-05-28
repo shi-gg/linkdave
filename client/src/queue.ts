@@ -1,5 +1,6 @@
 import type { Player, PlayOptions } from "./player.js";
 import { EventName } from "./types.js";
+import { unwrap } from "./utils.js";
 
 export interface QueueItem {
     uri: string;
@@ -20,10 +21,11 @@ export class Queue {
         return this;
     }
 
-    async start() {
+    start() {
         if (this.#tracks.length === 0) return;
         this.#active = true;
-        await this.#playCurrentTrack();
+
+        return this.#playCurrentTrack();
     }
 
     async skip() {
@@ -35,7 +37,7 @@ export class Queue {
             return;
         }
 
-        await this.#playCurrentTrack();
+        return this.#playCurrentTrack();
     }
 
     remove(index: number) {
@@ -69,19 +71,7 @@ export class Queue {
             return;
         }
 
-        const item = this.#tracks.shift();
-        if (!item) return;
-
-        this.#player
-            .play(item.uri, item.options, true)
-            .then(
-                () => null,
-                (error: unknown) => {
-                    const message = error instanceof Error ? error.message : String(error);
-                    this.#player.node.emit(EventName.QueueError, { guild_id: this.#player.guildId, item, error: message });
-                    this._onTrackEnd(true);
-                }
-            );
+        void this.#playCurrentTrack();
     }
 
     _deactivate() {
@@ -92,6 +82,15 @@ export class Queue {
         const item = this.#tracks.shift();
         if (!item) return;
 
-        await this.#player.play(item.uri, item.options, true);
+        const [, error] = await unwrap(this.#player.play(item.uri, item.options, true));
+        if (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.#player.node.emit(EventName.QueueError, { guild_id: this.#player.guildId, item, error: message });
+            this._onTrackEnd(true);
+
+            return false;
+        }
+
+        return true;
     }
 }
