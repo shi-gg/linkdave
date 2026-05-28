@@ -22,19 +22,19 @@ export class Queue {
     }
 
     start() {
-        if (this.#tracks.length === 0) return;
+        if (this.#tracks.length === 0) return false;
         this.#active = true;
 
         return this.#playCurrentTrack();
     }
 
     async skip() {
-        if (!this.#active) return;
+        if (!this.#active) return false;
 
         if (this.#tracks.length === 0) {
             this.#active = false;
             await this.#player.stop();
-            return;
+            return true;
         }
 
         return this.#playCurrentTrack();
@@ -80,7 +80,7 @@ export class Queue {
 
     async #playCurrentTrack() {
         const item = this.#tracks.shift();
-        if (!item) return;
+        if (!item) return false;
 
         const [, error] = await unwrap(this.#player.play(item.uri, item.options, true));
         if (error) {
