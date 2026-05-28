@@ -61,6 +61,10 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64, filters
 	req.Header.Set("User-Agent", cfg.UserAgent)
 	req.Header.Set("Content-Type", "application/json")
 
+	if cfg.TextToSpeechToken != "" {
+		req.Header.Set("Authorization", "Token "+cfg.TextToSpeechToken)
+	}
+
 	resp, err := ttsClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch tts: %w", err)
