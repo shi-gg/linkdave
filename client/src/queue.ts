@@ -11,7 +11,6 @@ export class Queue {
     readonly #player: Player;
     readonly #tracks: QueueItem[] = [];
     #active = false;
-    #playing = false;
 
     constructor(player: Player) {
         this.#player = player;
@@ -24,7 +23,7 @@ export class Queue {
 
     start() {
         if (this.#tracks.length === 0) return false;
-        if (this.#playing) return false;
+        if (this.#active) return false;
         this.#active = true;
 
         return this.#playCurrentTrack();
@@ -52,7 +51,6 @@ export class Queue {
     clear() {
         this.#tracks.length = 0;
         this.#active = false;
-        this.#playing = false;
     }
 
     get tracks(): readonly QueueItem[] {
@@ -88,17 +86,10 @@ export class Queue {
     }
 
     async #playCurrentTrack(isFromSkip = false) {
-        this.#playing = true;
-
         const item = this.#tracks.shift();
-        if (!item) {
-            this.#playing = false;
-            return false;
-        }
+        if (!item) return false;
 
         const [, error] = await unwrap(this.#player.play(item.uri, item.options, true));
-        this.#playing = false;
-
         if (!error) return true;
 
         const message = error instanceof Error ? error.message : String(error);
