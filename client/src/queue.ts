@@ -23,6 +23,7 @@ export class Queue {
 
     start() {
         if (this.#tracks.length === 0) return false;
+        if (this.#active) return false;
         this.#active = true;
 
         return this.#playCurrentTrack();
