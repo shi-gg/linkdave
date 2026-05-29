@@ -99,6 +99,6 @@ export class Queue {
             this.#player._onQueueEmpty();
         }
 
-        return false;
+        return this.#active;
     }
 }
