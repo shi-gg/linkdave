@@ -37,12 +37,13 @@ export class Queue {
             return true;
         }
 
-        return this.#playCurrentTrack();
+        return this.#playCurrentTrack(true);
     }
 
     remove(index: number) {
         if (index < 0 || index >= this.#tracks.length) return undefined;
         const [removed] = this.#tracks.splice(index, 1);
+
         return removed;
     }
 
@@ -63,34 +64,41 @@ export class Queue {
         return this.#active;
     }
 
-    _onTrackEnd(finished: boolean) {
+    _onTrackEnd(finished: boolean, isFromSkip = false) {
         if (!this.#active || !finished) return;
 
         if (this.#tracks.length === 0) {
             this.#active = false;
+
+            if (!isFromSkip) {
+                this.#player._onQueueEmpty();
+            }
+
             return;
         }
 
-        void this.#playCurrentTrack();
+        void this.#playCurrentTrack(isFromSkip);
     }
 
     _deactivate() {
         this.#active = false;
     }
 
-    async #playCurrentTrack() {
+    async #playCurrentTrack(isFromSkip = false) {
         const item = this.#tracks.shift();
         if (!item) return false;
 
         const [, error] = await unwrap(this.#player.play(item.uri, item.options, true));
-        if (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            this.#player.node.emit(EventName.QueueError, { guild_id: this.#player.guildId, item, error: message });
-            this._onTrackEnd(true);
+        if (!error) return true;
 
-            return false;
+        const message = error instanceof Error ? error.message : String(error);
+        this.#player.node.emit(EventName.QueueError, { guild_id: this.#player.guildId, item, error: message });
+        this._onTrackEnd(true, isFromSkip);
+
+        if (!this.#active && !isFromSkip) {
+            this.#player._onQueueEmpty();
         }
 
-        return true;
+        return this.#active;
     }
 }

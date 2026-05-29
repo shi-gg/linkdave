@@ -267,6 +267,14 @@ export class Player {
         await this.#sendPlay(url, options);
     }
 
+    _onQueueEmpty() {
+        if (this.#state === PlayerState.Idle) return;
+
+        this.#state = PlayerState.Idle;
+        this.#current = null;
+        this.#startTimer();
+    }
+
     async #sendPlay(url: string, options: PlayOptions = {}) {
         const filters = options.filters ?? this.#filters.toPayload();
         await this.#node.sendPlay(this.#guildId, {
