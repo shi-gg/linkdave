@@ -6,7 +6,7 @@
 **⚠️ In development, breaking changes ⚠️**
 
 ## About
-Linkdave is a golang rewrite of lavalink, aimed at performance, memory efficiency (193mib vs 12mib), stability and several other things for [Wamellow](https://wamellow.com/docs/text-to-speech).
+Linkdave is a golang rewrite of lavalink, aimed at performance, memory efficiency (lavalink @ 393mb-5.4gb vs linkdave @ 4mb with 38 players*), stability and several other things for [Wamellow](https://wamellow.com/docs/text-to-speech).
 
 Interoperability in the server and client libraries is an absolute non-goal. Read the [Linkdave TypeScript library documentation](https://npmx.dev/package-docs/linkdave/v/latest) for more details and how to use it. Linkdave is built from the ground up to support [Discord Audio & Video End-to-End Encryption (DAVE)](https://daveprotocol.com/), which is also where the name comes from.
 
@@ -38,12 +38,6 @@ services:
         restart: unless-stopped
         ports:
             - "8080:8080"
-        healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-            interval: 30s
-            timeout: 3s
-            start_period: 5s
-            retries: 3
         logging:
             driver: json-file
             options:
@@ -208,3 +202,5 @@ Linkdave is built for high availability. When a server node needs to shut down (
 5. **Zero Downtime:** The draining server waits until its tracked player count drops to zero (or hits a 30-second hard timeout deadline) before fully powering off, ensuring no track is ever forcefully interrupted.
 
 The gap between closing the UDP connection on the old node and sending the first opus frame from the new node is under 500ms, providing a near-seamless experience for listeners.
+
+<sub>*Not sure what's going on with lavalink 4.2.2, but 38 players uses anything from 393mb to 5,300mb in production, averaging aboove 1gb.</sub>
