@@ -1,5 +1,5 @@
 import type { Player, PlayOptions } from "./player.js";
-import { EventName } from "./types.js";
+import { EventName, PlayerState } from "./types.js";
 import { unwrap } from "./utils.js";
 
 export interface QueueItem {
@@ -25,6 +25,10 @@ export class Queue {
         if (this.#tracks.length === 0) return false;
         if (this.#active) return false;
         this.#active = true;
+
+        if (this.#player.state === PlayerState.Connecting) {
+            return true;
+        }
 
         return this.#playCurrentTrack();
     }
@@ -83,6 +87,17 @@ export class Queue {
 
     _deactivate() {
         this.#active = false;
+    }
+
+    _onConnectReady() {
+        if (!this.#active) return;
+
+        if (this.#tracks.length === 0) {
+            this.#active = false;
+            return;
+        }
+
+        void this.#playCurrentTrack();
     }
 
     async #playCurrentTrack(isFromSkip = false) {
