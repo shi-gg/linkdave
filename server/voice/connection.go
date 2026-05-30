@@ -293,6 +293,7 @@ func (w *trackWrapper) ProvideOpusFrame() ([]byte, error) {
 	if paused {
 		return nil, nil
 	}
+
 	return w.conn.provideOpusFrame(src)
 }
 
@@ -330,6 +331,7 @@ func (c *Connection) provideOpusFrame(src source.Source) ([]byte, error) {
 	if err != nil {
 		c.handleTrackEnd(src, err)
 	}
+
 	return frame, err
 }
 
@@ -371,7 +373,6 @@ func (c *Connection) Close() {
 		return
 	}
 
-	// Close the disgo voice connection with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	vc.Close(ctx)
