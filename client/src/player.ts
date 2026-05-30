@@ -374,13 +374,19 @@ export class Player {
             this.#current = null;
             this.#startTimer();
         }
+
         this.#queue._onTrackEnd(data.reason !== TrackEndReason.Stopped && data.reason !== TrackEndReason.Replaced);
     }
 
     _onVoiceConnect() {
         if (this.#state !== PlayerState.Connecting) return;
+
         this.#state = PlayerState.Idle;
-        this.#startTimer();
+        this.#queue._onConnectReady();
+
+        if (!this.#queue.active) {
+            this.#startTimer();
+        }
     }
 
     #cleanup() {
