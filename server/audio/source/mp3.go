@@ -27,7 +27,6 @@ const (
 	OPUS_FRAME_DURATION_MS = OPUS_FRAME_SIZE * 1000 / OPUS_SAMPLE_RATE
 	OPUS_MAX_FRAME_BYTES   = 4000
 
-	IDLE_TIMEOUT       = 10 * time.Second
 	DIAL_TIMEOUT       = 5 * time.Second
 	KEEPALIVE_INTERVAL = 30 * time.Second
 
@@ -90,30 +89,6 @@ func clientForIP(ip string) *http.Client {
 	return client
 }
 
-type idleTimeoutReader struct {
-	body  io.ReadCloser
-	timer *time.Timer
-}
-
-func newIdleTimeoutReader(body io.ReadCloser) *idleTimeoutReader {
-	r := &idleTimeoutReader{body: body}
-	r.timer = time.AfterFunc(IDLE_TIMEOUT, func() { _ = body.Close() })
-	return r
-}
-
-func (r *idleTimeoutReader) Read(p []byte) (int, error) {
-	n, err := r.body.Read(p)
-	if n > 0 {
-		r.timer.Reset(IDLE_TIMEOUT)
-	}
-	return n, err
-}
-
-func (r *idleTimeoutReader) Close() error {
-	r.timer.Stop()
-	return r.body.Close()
-}
-
 type MP3Source struct {
 	url       string
 	body      io.ReadCloser
@@ -161,12 +136,10 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64, fil
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
 
-	body := newIdleTimeoutReader(resp.Body)
-
 	rawProbe := make([]byte, PROBE_SIZE)
-	rn, err := io.ReadFull(body, rawProbe)
+	rn, err := io.ReadFull(resp.Body, rawProbe)
 	if err != nil && err != io.ErrUnexpectedEOF {
-		body.Close()
+		resp.Body.Close()
 		return nil, fmt.Errorf("read initial data: %w", err)
 	}
 
@@ -174,8 +147,8 @@ func NewMP3Source(ctx context.Context, urlStr, ip string, startTimeMs int64, fil
 	xingFrames := parseXingFrames(rawProbe)
 
 	reader := &prefixedReadCloser{
-		Reader: io.MultiReader(bytes.NewReader(rawProbe), body),
-		closer: body,
+		Reader: io.MultiReader(bytes.NewReader(rawProbe), resp.Body),
+		closer: resp.Body,
 	}
 
 	source, err := NewMP3SourceFromReader(reader, urlStr, startTimeMs, filters)
