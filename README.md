@@ -203,4 +203,4 @@ Linkdave is built for high availability. When a server node needs to shut down (
 
 The gap between closing the UDP connection on the old node and sending the first opus frame from the new node is under 500ms, providing a near-seamless experience for listeners.
 
-<sub>*Not sure what's going on with lavalink 4.2.2, but 38 players uses anything from 393mb to 5,300mb in production, averaging aboove 1gb.</sub>
+<sub>*I'm not sure what's going on with Lavalink 4.2.2, but 38 players use anything from 393mb to 5,300mb in production, with an average of above 1000mb.</sub>
