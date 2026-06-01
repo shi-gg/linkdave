@@ -17,7 +17,7 @@ import (
 
 	"github.com/hraban/opus"
 	"github.com/shi-gg/linkdave/server/audio/filter"
-	"github.com/tosone/minimp3"
+	"github.com/shi-gg/minimp3"
 )
 
 const (
