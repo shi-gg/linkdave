@@ -111,8 +111,8 @@ export class Player {
         return this.#state === PlayerState.Paused;
     }
 
-    get connectable() {
-        return this.#state !== PlayerState.Connecting;
+    get connecting() {
+        return this.#state === PlayerState.Connecting;
     }
 
     get connected() {
@@ -129,7 +129,7 @@ export class Player {
             throw new RangeError("No voice channel ID provided");
         }
 
-        if (this.#state !== PlayerState.Connecting) {
+        if (this.connecting) {
             throw new Error("Player is already connecting");
         }
 
