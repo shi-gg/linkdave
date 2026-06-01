@@ -129,7 +129,7 @@ export class Player {
             throw new RangeError("No voice channel ID provided");
         }
 
-        if (!this.connectable) {
+        if (!this.connectable && targetChannel === this.#voiceChannelId) {
             throw new Error("Player is already connecting or connected");
         }
 
