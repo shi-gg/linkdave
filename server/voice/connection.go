@@ -74,7 +74,9 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	c.mutex.Unlock()
 
 	if oldVC != nil {
-		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		// TODO: remove once disgo/voice fixed the infinite blocking
+		// https://discord.com/channels/817327181659111454/817327182111571989/1511127289402757120
+		closeCtx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
 		oldVC.Close(closeCtx)
 		cancel()
 	}
@@ -98,25 +100,6 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		c.guildID,
 		c.userID,
 		func(ctx context.Context, guildID snowflake.ID, channelID *snowflake.ID, selfMute, selfDeaf bool) error {
-			if channelID != nil {
-				return nil
-			}
-
-			c.mutex.Lock()
-			isCurrent := c.voiceConn == vc
-			isTarget := c.targetVoiceConn == vc
-			c.mutex.Unlock()
-
-			if vc != nil && (isCurrent || isTarget) {
-				vc.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
-					VoiceState: discord.VoiceState{
-						GuildID:   guildID,
-						ChannelID: nil,
-						UserID:    c.userID,
-					},
-				})
-			}
-
 			return nil
 		},
 		func() {
