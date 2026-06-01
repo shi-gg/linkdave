@@ -115,6 +115,10 @@ export class Player {
         return this.#voiceState !== null;
     }
 
+    get connectable() {
+        return !this.connected && this.#state !== PlayerState.Connecting;
+    }
+
     get filters(): PlayerFilters {
         return this.#filters;
     }
@@ -123,6 +127,10 @@ export class Player {
         const targetChannel = channelId ?? this.#voiceChannelId;
         if (!targetChannel) {
             throw new RangeError("No voice channel ID provided");
+        }
+
+        if (!this.connectable) {
+            throw new Error("Player is already connecting or connected");
         }
 
         this.#voiceChannelId = targetChannel;
