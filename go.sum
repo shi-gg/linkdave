@@ -36,10 +36,10 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sasha-s/go-csync v0.0.0-20240107134140-fcbab37b09ad h1:qIQkSlF5vAUHxEmTbaqt1hkJ/t6skqEGYiMag343ucI=
 github.com/sasha-s/go-csync v0.0.0-20240107134140-fcbab37b09ad/go.mod h1:/pA7k3zsXKdjjAiUhB5CjuKib9KJGCaLvZwtxGC8U0s=
+github.com/shi-gg/minimp3 v1.0.3-0.20260601110419-3b34065acf82 h1:CHFvPPb5wLYOZDGEN4NiEUEZRMDBSKWuVY1wBeWiKvc=
+github.com/shi-gg/minimp3 v1.0.3-0.20260601110419-3b34065acf82/go.mod h1:hAMWIl1N2SX+bWOcDRszUNf1sp0fYkPb0AY5xvqvA/Q=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/tosone/minimp3 v1.0.2 h1:htFE2EbP7Y4CJ8KGW9c55tKWRpzv9kXkEmCYGxFzVjA=
-github.com/tosone/minimp3 v1.0.2/go.mod h1:N6vjknGR7PboMTyJVhe/7RHNQiIc0jWZxFKlSWdfzwc=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
 golang.org/x/crypto v0.52.0 h1:RMs7fP2rXdep0CftQlK8Uf+kibLm7qkCcradZWYz988=

@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hraban/opus v0.0.0-20251117090126-c76ea7e21bf3
-	github.com/tosone/minimp3 v1.0.2
+	github.com/shi-gg/minimp3 v1.0.3-0.20260601110419-3b34065acf82
 )
 
 require (
