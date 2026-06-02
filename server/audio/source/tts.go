@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/shi-gg/linkdave/server/audio/filter"
 )
@@ -31,8 +30,8 @@ type ttsInvokeResponse struct {
 	Speaker  string `json:"speaker"`
 }
 
-var ttsClient = &http.Client{
-	Timeout: 10 * time.Second,
+var client = &http.Client{
+	Timeout: DIAL_TIMEOUT,
 }
 
 func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64, filters *filter.Filters) (*MP3Source, error) {
@@ -65,7 +64,7 @@ func NewTTSSource(ctx context.Context, urlStr string, startTimeMs int64, filters
 		req.Header.Set("Authorization", "Token "+cfg.TextToSpeechToken)
 	}
 
-	resp, err := ttsClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch tts: %w", err)
 	}
