@@ -98,7 +98,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		c.guildID,
 		c.userID,
 		func(ctx context.Context, guildID snowflake.ID, channelID *snowflake.ID, selfMute, selfDeaf bool) error {
-			if channelID != nil || c.closed.Load() {
+			if channelID != nil || vc == nil || c.closed.Load() {
 				return nil
 			}
 
@@ -107,7 +107,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			isTarget := c.targetVoiceConn == vc
 			c.mutex.Unlock()
 
-			if vc != nil && (isCurrent || isTarget) {
+			if isCurrent || isTarget {
 				vc.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
 					VoiceState: discord.VoiceState{
 						GuildID:   guildID,
@@ -172,19 +172,18 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		return fmt.Errorf("failed to open voice connection: %w", err)
 	}
 
-	c.mutex.Lock()
 	if c.closed.Load() {
-		c.mutex.Unlock()
 		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		vc.Close(closeCtx)
 		cancel()
 		return fmt.Errorf("connection closed during setup")
 	}
 
+	c.mutex.Lock()
 	c.voiceConn = vc
 	c.targetVoiceConn = nil
 	c.channelID = channelID
-	c.safeSetOpusFrameProvider(vc, &trackWrapper{conn: c})
+	vc.SetOpusFrameProvider(&trackWrapper{conn: c})
 	c.mutex.Unlock()
 
 	return nil
@@ -284,13 +283,12 @@ type trackWrapper struct {
 func (w *trackWrapper) ProvideOpusFrame() ([]byte, error) {
 	w.conn.mutex.Lock()
 	src := w.conn.source
-	paused := w.conn.paused.Load()
 	w.conn.mutex.Unlock()
 
 	if src == nil {
 		return nil, nil
 	}
-	if paused {
+	if w.conn.paused.Load() {
 		return nil, nil
 	}
 
@@ -304,26 +302,6 @@ func (w *trackWrapper) Close() {
 	if w.conn.source != nil {
 		w.conn.source.Close()
 	}
-}
-
-// safeSetOpusFrameProvider wraps SetOpusFrameProvider with a recover to guard
-// against a race condition in disgo where the audio sender's cancelFunc can be
-// nil if Close() is called before the open() goroutine sets it.
-// The caller must capture voiceConn under c.mutex and pass it as vc.
-func (c *Connection) safeSetOpusFrameProvider(vc voice.Conn, provider voice.OpusFrameProvider) {
-	if vc == nil {
-		return
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			c.logger.Warn("recovered from panic in SetOpusFrameProvider",
-				slog.Any("panic", r),
-				slog.String("guild_id", c.guildID.String()),
-			)
-		}
-	}()
-	vc.SetOpusFrameProvider(provider)
 }
 
 func (c *Connection) provideOpusFrame(src source.Source) ([]byte, error) {
