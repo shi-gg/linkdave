@@ -98,7 +98,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		c.guildID,
 		c.userID,
 		func(ctx context.Context, guildID snowflake.ID, channelID *snowflake.ID, selfMute, selfDeaf bool) error {
-			if channelID != nil || vc != nil || c.closed.Load() {
+			if channelID != nil || vc == nil || c.closed.Load() {
 				return nil
 			}
 
