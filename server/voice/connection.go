@@ -11,10 +11,10 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/voice"
-	"github.com/disgoorg/godave/golibdave"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/shi-gg/linkdave/server/audio/source"
 	"github.com/shi-gg/linkdave/server/protocol"
+	"github.com/thomas-vilte/dave-go/session"
 )
 
 type Connection struct {
@@ -138,7 +138,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			c.mutex.Unlock()
 		},
 		voice.WithConnLogger(c.logger),
-		voice.WithConnDaveSessionCreateFunc(golibdave.NewSession),
+		voice.WithConnDaveSessionCreateFunc(session.New),
 	)
 
 	openCtx, openCancel := context.WithCancel(ctx)
