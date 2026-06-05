@@ -111,13 +111,13 @@ DrainLoop:
 
 func logLevel() slog.Level {
 	switch os.Getenv("LINKDAVE_LOG_LEVEL") {
-	case "INFO":
-		return slog.LevelInfo
+	case "DEBUG":
+		return slog.LevelDebug
 	case "WARN":
 		return slog.LevelWarn
 	case "ERROR":
 		return slog.LevelError
 	default:
-		return slog.LevelDebug
+		return slog.LevelInfo
 	}
 }
