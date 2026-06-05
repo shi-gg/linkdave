@@ -8,7 +8,7 @@ Linkdave is a golang rewrite of lavalink, aimed at performance, memory efficienc
 
 Interoperability in the server and client libraries is an absolute non-goal. Read the [Linkdave TypeScript library documentation](https://npmx.dev/package-docs/linkdave/v/latest) for more details and how to use it. Linkdave is built from the ground up to support [Discord Audio & Video End-to-End Encryption (DAVE)](https://daveprotocol.com/), which is also where the name comes from.
 
-A big difference is that tracks do not need to be resolved first, and therefore  are only fetched once at play time without needing another roundtrip.
+A big difference is that tracks do not need to be resolved first, and therefore are only fetched once at play time without needing another roundtrip.
 
 **The following sources are currently supported**
 - Remote MP3 files and streams
@@ -94,7 +94,7 @@ You can interact with the server over http with the following methods and paths.
 |---|---|---|
 | `GET` | `/health` | Health check |
 | `GET` | `/stats` | Server statistics |
-| `GET` | `/ws` | Health check |
+| `GET` | `/ws` | WebSocket endpoint |
 | `POST` | `/sessions/{session_id}/players/{guild_id}/play` | Play a track for a player in a session |
 | `POST` | `/sessions/{session_id}/players/{guild_id}/pause` | Pause the current track |
 | `POST` | `/sessions/{session_id}/players/{guild_id}/resume` | Resume the paused track |
@@ -145,7 +145,7 @@ docker compose restart linkdave
 ```
 
 ### Binary Deployment
-Alternatively, you can download the latest binary release from the [GitHub Releases page](https://github.com/shi-gg/linkdave/releases) and run it directly on your server. Linkdave bundles it's own DAVE library for [Discord Audio E2EE](https://daveprotocol.com) inside the binary and the Docker image, therefor no `libdave.so` has to be installed.
+Alternatively, you can download the latest binary release from the [GitHub Releases page](https://github.com/shi-gg/linkdave/releases) and run it directly on your server. Linkdave bundles its own DAVE library for [Discord Audio E2EE](https://daveprotocol.com) inside the binary and the Docker image, therefore no `libdave.so` has to be installed.
 
 To start the server, run:
 ```bash
