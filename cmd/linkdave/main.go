@@ -34,8 +34,6 @@ func main() {
 	defer sentry.Flush(2 * time.Second)
 
 	logger.Info("starting linkdave", slog.String("version", version))
-	logger.Warn("starting linkdave", slog.String("version", version))
-	logger.Error("starting linkdave", slog.String("version", version))
 	source.SetVersion(version)
 
 	manager := voice.NewManager(logger)
