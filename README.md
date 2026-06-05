@@ -3,30 +3,109 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I3I6AFVAP)
 
-**⚠️ In development, breaking changes ⚠️**
-
 ## About
-Linkdave is a golang rewrite of lavalink, aimed at performance, memory efficiency (lavalink @ 393mb-5.4gb vs linkdave @ 4mb with 38 players*), stability and several other things for [Wamellow](https://wamellow.com/docs/text-to-speech).
+Linkdave is a golang rewrite of lavalink, aimed at performance, memory efficiency (lavalink @ 393mb-5.4gb vs linkdave @ 3mb with 38 players*), stability and several other things for [Wamellow Text-to-Speech](https://wamellow.com/docs/text-to-speech).
 
 Interoperability in the server and client libraries is an absolute non-goal. Read the [Linkdave TypeScript library documentation](https://npmx.dev/package-docs/linkdave/v/latest) for more details and how to use it. Linkdave is built from the ground up to support [Discord Audio & Video End-to-End Encryption (DAVE)](https://daveprotocol.com/), which is also where the name comes from.
 
-The following sources are currently supported:
+A big difference is that tracks do not need to be resolved first, and therefore are only fetched once at play time without needing another roundtrip.
+
+**You can use the following sources to play audio**
 - Remote MP3 files and streams
 - Text to Speech (using the [Wamellow TTS API](https://wamellow.com/docs/text-to-speech))
+<br />
+
+```ts
+const player = linkdave.getPlayer("GUILD_ID"); // <- GET or CREATE player
+await player.connect("VOICE_CHANNEL_ID");
+
+await player.play("https://icepool.silvacast.com/GAYFM.mp3"); // 24/7 radio stream
+await player.play(constructUri.tts("Hello world", "en_female_samc")); // Text to Speech
+```
+
+Tracks can also be queued
+```ts
+const player = linkdave.getPlayer("GUILD_ID");
+await player.connect("VOICE_CHANNEL_ID");
+
+player.queue.add("https://icepool.silvacast.com/GAYFM.mp3");
+await player.queue.start();
+```
+<br />
+
+**You can use the following filters to modify audio**
+- Vaporwave
+- Nightcore
+- Rotation
+- Tremolo
+- Vibrato
+- LowPass
+- Customizable Pitch
+- Customizable Speed
+<br />
+
+```ts
+// every track after the current one
+player.filters.toggle(Filter.Nightcore)
+player.filters.speed = 0.5;
+player.filters.pitch = 0.5;
+
+// single track only (works on `player.play` as well)
+player.queue.add(
+    constructUri.tts(fullText, voice, translate),
+    {
+        requesterId: message.author.id,
+        filters: {
+            enabled: [Filter.Vaporwave],
+            speed: 0.5,
+            pitch: 0.5
+        }
+    }
+);
+```
 
 If you need help using this, [join our Discord Server](https://discord.com/invite/yYd6YKHQZH).
 
 ## Setup & Usage
 
-### ⚙️ How the Server Works
 Linkdave consists of a Go-based audio server that manages Discord voice connections and playback.
 
-- **WebSocket (`/ws`):** Provides a persistent connection for real-time events.
-- **REST API:** Exposes endpoints to control playback operations.
+- **WebSocket:** Provides a persistent connection for real-time events.
+- **API:** Exposes endpoints to control playback operations.
 
 The server leverages custom audio processing to directly pipeline from an audio source into Discord's UDP socket for low-latency streaming without relying on external bloat.
 
-#### Docker Deployment
+The following env variables can be set for the server.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `LINKDAVE_SOURCE_HTTP_ENABLED` | bool | `false` | Enable HTTP source checking |
+| `LINKDAVE_SOURCE_HTTPS_ENABLED` | bool | `false` | Enable HTTPS source checking |
+| `LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED` | bool | `false` | Enable public IP address source |
+| `LINKDAVE_SOURCE_IP_ADDRESS_PRIVATE_ENABLED` | bool | `false` | Enable private IP address source |
+| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_ENABLED` | bool | `false` | Enable text-to-speech source |
+| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_URL` | string | `tts.wamellow.com/api/invoke` | Text-to-speech API endpoint |
+| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_TOKEN` | string | — | Authentication token for the TTS API |
+| `LINKDAVE_PASSWORD` | string | — | Application password |
+| `LINKDAVE_LOG_LEVEL` | string | `INFO` | Log level (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
+
+You can interact with the server over http with the following methods and paths.
+
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `GET` | `/stats` | Server statistics |
+| `GET` | `/ws` | WebSocket endpoint |
+| `POST` | `/sessions/{session_id}/players/{guild_id}/play` | Play a track for a player in a session |
+| `POST` | `/sessions/{session_id}/players/{guild_id}/pause` | Pause the current track |
+| `POST` | `/sessions/{session_id}/players/{guild_id}/resume` | Resume the paused track |
+| `POST` | `/sessions/{session_id}/players/{guild_id}/stop` | Stop the current track |
+| `POST` | `/sessions/{session_id}/players/{guild_id}/seek` | Seek to a position in the track |
+| `DELETE` | `/sessions/{session_id}/players/{guild_id}` | Disconnect and destroy the player |
+
+<sub>Regarding the list of gateway events and their behavior, please read the source code.</sub>
+
+### Docker Deployment
 To deploy Linkdave using Docker, you can use the following `compose.yml` configuration. This setup exposes the WebSocket API on port 8080 and includes health checks to ensure the service is running properly.
 
 `compose.yml`:
@@ -50,7 +129,6 @@ services:
 ```
 
 To generate a random password, you can use the following command in your terminal:
-
 ```bash
 echo "LINKDAVE_PASSWORD=$(openssl rand -hex 16)" >> .env
 cat .env
@@ -67,90 +145,18 @@ docker pull ghcr.io/shi-gg/linkdave:latest
 docker compose restart linkdave
 ```
 
-#### Binary Deployment
-Alternatively, you can download the latest binary release from the [GitHub Releases page](https://github.com/shi-gg/linkdave/releases) and run it directly on your server.
+### Binary Deployment
+Alternatively, you can download the latest binary release from the [GitHub Releases page](https://github.com/shi-gg/linkdave/releases) and run it directly on your server. Linkdave bundles its own DAVE library for [Discord Audio E2EE](https://daveprotocol.com) inside the binary and the Docker image, therefore no `libdave.so` has to be installed.
 
-> [!CAUTION]
-> Linkdave relies on a C library, `libdave.so` from [discord/libdave](https://github.com/discord/libdave), for [Discord Audio E2EE](https://daveprotocol.com). This library is included in the Docker image, but not the binary.
-
-When using the standalone `linkdave-linux-amd64` binary, the system needs to know where to find the `libdave.so` shared library. Without it, the application will fail to launch, and running `ldd linkdave-linux-amd64` will report `libdave.so => not found`.
-
-To download the library, go to the [libdave releases page](https://github.com/discord/libdave/releases) and download the `libdave-Linux-X64-boringssl.zip` asset. Extract the `lib/libdave.so` file and follow one of the installation methods below.
-
-<details>
-
-<summary>Installing the `libdave.so` library</summary>
-
-Choose one of the methods below based on your OS and whether you want a system-wide or portable installation.
-
-##### Method 1: System-Wide Installation (Recommended)
-Installing the library system-wide allows you to run `linkdave-linux-amd64` from anywhere without needing to set environment variables.
-
-###### Ubuntu / Debian
-On Ubuntu and Debian systems, the standard directory for local 64-bit shared libraries is `/usr/local/lib`.
-
+To start the server, run:
 ```bash
-# 1. Copy the library to the standard path
-sudo cp libdave.so /usr/local/lib/
+curl -L -o linkdave https://github.com/shi-gg/linkdave/releases/latest/download/linkdave-linux-amd64
+chmod +x linkdave
 
-# 2. Update the dynamic linker cache
-sudo ldconfig
-
-# 3. Make the binary executable
-chmod +x ./linkdave-linux-amd64
-
-# 4. Verify the library is found (it should map to /usr/local/lib/libdave.so)
-ldd ./linkdave-linux-amd64 | grep libdave
+LINKDAVE_SOURCE_HTTPS_ENABLED=true LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED=true ./linkdave
 ```
 
-###### RHEL / Fedora / CentOS
-On Red Hat-based systems, 64-bit libraries belong in `/usr/local/lib64`.
-Depending on your system configuration, you might also need to explicitly add this directory to the linker's search path.
-
-```bash
-# 1. Create the directory (if it doesn't exist) and copy the library
-sudo mkdir -p /usr/local/lib64
-sudo cp libdave.so /usr/local/lib64/
-
-# 2. Ensure the directory is in the linker's search path
-echo "/usr/local/lib64" | sudo tee /etc/ld.so.conf.d/local64.conf
-
-# 3. Update the dynamic linker cache
-sudo ldconfig
-
-# 4. Make the binary executable
-chmod +x ./linkdave-linux-amd64
-
-# 5. Verify the library is found (it should map to /usr/local/lib64/libdave.so)
-ldd ./linkdave-linux-amd64 | grep libdave
-```
-
----
-
-##### Method 2: Portable Setup (No Root Required)
-If you do not have `sudo` access or prefer to keep the binary and library together in a self-contained folder, you can run the binary by explicitly passing the library path at runtime.
-
-Ensure `libdave.so` and `linkdave-linux-amd64` are in the same folder.
-
-```bash
-# 1. Make the binary executable
-chmod +x ./linkdave-linux-amd64
-
-# 2. Run the binary with LD_LIBRARY_PATH set to the current directory
-LD_LIBRARY_PATH=. ./linkdave-linux-amd64
-```
-
----
-
-##### Run the binary
-
-```bash
-LINKDAVE_SOURCE_HTTPS_ENABLED=true LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED=true ./linkdave-linux-amd64
-```
-
-</details>
-
-### 💻 Using the Client Library (TypeScript)
+## Using the Client Library (TypeScript)
 Linkdave provides a robust, fully type-safe, TypeScript client for seamless interaction.
 
 There is a quick example bot inside the [`example/`](https://github.com/shi-gg/linkdave/blob/main/example/index.ts) directory, and a deploy ready 24/7 radio music bot at [github.com/shi-gg/radio-bot](https://github.com/shi-gg/radio-bot).
@@ -192,7 +198,7 @@ await player.play("https://icepool.silvacast.com/GAYFM.mp3");
 discord.login(process.env.DISCORD_TOKEN);
 ```
 
-### 🔄 Seamless Node Migrations & Graceful Shutdown
+## Seamless Node Migrations & Graceful Shutdown
 Linkdave is built for high availability. When a server node needs to shut down (e.g., for an update or maintenance), it can do so without dropping any active audio streams across your bots using **Graceful Migrations**.
 
 1. **Draining Mode:** Upon receiving a `SIGINT` or `SIGTERM`, the Linkdave server enters "draining" mode. It stops accepting new players and broadcasts a `NodeDraining` message via the WebSocket to all connected clients.
