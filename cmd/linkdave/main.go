@@ -26,24 +26,20 @@ var (
 )
 
 func main() {
-	baseHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})
-	logger := slog.New(sentry.NewHandler(baseHandler))
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel()})
+	logger := slog.New(sentry.NewHandler(handler))
 	slog.SetDefault(logger)
 
 	sentry.Init(os.Getenv("SENTRY_DSN"), version)
 	defer sentry.Flush(2 * time.Second)
 
-	logger.Info("starting linkdave",
-		slog.String("version", version),
-	)
-
+	logger.Info("starting linkdave", slog.String("version", version))
 	source.SetVersion(version)
-	voiceManager := voice.NewManager(logger)
-	server := server.NewServer(logger, voiceManager, version, password)
 
+	manager := voice.NewManager(logger)
+	server := server.NewServer(logger, manager, version, password)
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/ws", server.HandleWebSocket)
 	server.RegisterRoutes(mux)
 
@@ -102,12 +98,24 @@ DrainLoop:
 	defer cancel()
 
 	logger.Info("shutting down servers...")
-
-	voiceManager.Close()
+	manager.Close()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
 		logger.Error("server shutdown error", slog.Any("error", err))
 	}
 
 	logger.Info("linkdave stopped")
+}
+
+func logLevel() slog.Level {
+	switch os.Getenv("LINKDAVE_LOG_LEVEL") {
+	case "DEBUG":
+		return slog.LevelDebug
+	case "WARN":
+		return slog.LevelWarn
+	case "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
