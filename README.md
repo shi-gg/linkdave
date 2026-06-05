@@ -4,13 +4,13 @@
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I3I6AFVAP)
 
 ## About
-Linkdave is a golang rewrite of lavalink, aimed at performance, memory efficiency (lavalink @ 393mb-5.4gb vs linkdave @ 3mb with 38 players*), stability and several other things for [Wamellow](https://wamellow.com/docs/text-to-speech).
+Linkdave is a golang rewrite of lavalink, aimed at performance, memory efficiency (lavalink @ 393mb-5.4gb vs linkdave @ 3mb with 38 players*), stability and several other things for [Wamellow Text-to-Speech](https://wamellow.com/docs/text-to-speech).
 
 Interoperability in the server and client libraries is an absolute non-goal. Read the [Linkdave TypeScript library documentation](https://npmx.dev/package-docs/linkdave/v/latest) for more details and how to use it. Linkdave is built from the ground up to support [Discord Audio & Video End-to-End Encryption (DAVE)](https://daveprotocol.com/), which is also where the name comes from.
 
 A big difference is that tracks do not need to be resolved first, and therefore are only fetched once at play time without needing another roundtrip.
 
-**The following sources are currently supported**
+**You can use the following sources to play audio**
 - Remote MP3 files and streams
 - Text to Speech (using the [Wamellow TTS API](https://wamellow.com/docs/text-to-speech))
 <br />
@@ -25,15 +25,15 @@ await player.play(constructUri.tts("Hello world", "en_female_samc")); // Text to
 
 Tracks can also be queued
 ```ts
-const player = linkdave.getPlayer("GUILD_ID"); // <- GET or CREATE player
+const player = linkdave.getPlayer("GUILD_ID");
 await player.connect("VOICE_CHANNEL_ID");
 
-player.queue.add("https://icepool.silvacast.com/GAYFM.mp3"); // 24/7 radio stream
+player.queue.add("https://icepool.silvacast.com/GAYFM.mp3");
 await player.queue.start();
 ```
 <br />
 
-**The following filters are currently supported**
+**You can use the following filters to modify audio**
 - Vaporwave
 - Nightcore
 - Rotation
@@ -70,8 +70,8 @@ If you need help using this, [join our Discord Server](https://discord.com/invit
 
 Linkdave consists of a Go-based audio server that manages Discord voice connections and playback.
 
-- **WebSocket (`/ws`):** Provides a persistent connection for real-time events.
-- **REST API:** Exposes endpoints to control playback operations.
+- **WebSocket:** Provides a persistent connection for real-time events.
+- **API:** Exposes endpoints to control playback operations.
 
 The server leverages custom audio processing to directly pipeline from an audio source into Discord's UDP socket for low-latency streaming without relying on external bloat.
 
@@ -87,6 +87,7 @@ The following env variables can be set for the server.
 | `LINKDAVE_SOURCE_TEXT_TO_SPEECH_URL` | string | `tts.wamellow.com/api/invoke` | Text-to-speech API endpoint |
 | `LINKDAVE_SOURCE_TEXT_TO_SPEECH_TOKEN` | string | — | Authentication token for the TTS API |
 | `LINKDAVE_PASSWORD` | string | — | Application password |
+| `LINKDAVE_LOG_LEVEL` | string | `INFO` | Log level (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 
 You can interact with the server over http with the following methods and paths.
 
@@ -102,7 +103,7 @@ You can interact with the server over http with the following methods and paths.
 | `POST` | `/sessions/{session_id}/players/{guild_id}/seek` | Seek to a position in the track |
 | `DELETE` | `/sessions/{session_id}/players/{guild_id}` | Disconnect and destroy the player |
 
-<sub>For the list of gateway events and their behavior, please read the source code</sub>
+<sub>Regarding the list of gateway events and their behavior, please read the source code.</sub>
 
 ### Docker Deployment
 To deploy Linkdave using Docker, you can use the following `compose.yml` configuration. This setup exposes the WebSocket API on port 8080 and includes health checks to ensure the service is running properly.
