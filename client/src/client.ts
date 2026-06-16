@@ -275,6 +275,7 @@ export class LinkDaveClient extends EventEmitter {
     #handleVoiceDisconnect(node: Node, data: VoiceDisconnectPayload) {
         const player = this.#players.get(data.guild_id);
         if (player?.node !== node) return;
+        if (player.connecting) return;
 
         if (data.reason === DisconnectReason.ConnectionLost) {
             this.#handleConnectionLost(player);
