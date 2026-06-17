@@ -229,15 +229,21 @@ func (c *Connection) scheduleUnexpectedDisconnect() {
 
 func (c *Connection) handleUnexpectedDisconnect() {
 	c.mutex.Lock()
-	timer := c.staleTimer
-	c.staleTimer = nil
-	stale := c.voiceConn == nil && c.targetVoiceConn == nil
-	c.mutex.Unlock()
 
-	if timer == nil || !stale || c.closed.Swap(true) {
+	if c.staleTimer == nil {
+		c.mutex.Unlock()
 		return
 	}
 
+	c.staleTimer = nil
+	stale := c.voiceConn == nil && c.targetVoiceConn == nil
+
+	if !stale || c.closed.Swap(true) {
+		c.mutex.Unlock()
+		return
+	}
+
+	c.mutex.Unlock()
 	c.logger.Info("sending unexpected disconnect", slog.String("guild_id", c.guildID.String()))
 
 	c.Stop()
