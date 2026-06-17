@@ -84,11 +84,14 @@ func (m *Manager) Connect(ctx context.Context, sessionID string, userID, guildID
 	}
 
 	var conn *Connection
-	conn, err := NewConnection(ctx, m.logger, userID, guildID, channelID, discordSessionID, event, func(src source.Source, reason string, err error) {
-		m.onTrackEnd(sessionID, guildID, src, reason, err)
-	}, func() {
-		m.onDisconnect(sessionID, guildID, conn, key)
-	})
+	conn, err := NewConnection(ctx, m.logger, userID, guildID, channelID, discordSessionID, event,
+		func(src source.Source, reason string, err error) {
+			m.onTrackEnd(sessionID, guildID, src, reason, err)
+		},
+		func() {
+			m.onDisconnect(sessionID, guildID, conn, key)
+		},
+	)
 
 	if err != nil {
 		return fmt.Errorf("failed to create voice connection: %w", err)

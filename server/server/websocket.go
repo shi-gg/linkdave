@@ -253,6 +253,10 @@ func (s *Server) handleVoiceUpdate(client *Client, data json.RawMessage) {
 	err := s.voiceManager.Connect(ctx, client.sessionID, update.ClientID, update.GuildID, update.ChannelID, update.SessionID, update.Event)
 	if err != nil {
 		s.logger.Error("failed to connect to voice", slog.Any("error", err))
+		client.removePlayer(update.GuildID)
+		if disconnectErr := s.voiceManager.Disconnect(client.sessionID, update.GuildID); disconnectErr != nil {
+			s.logger.Error("failed to clean up failed voice connection", slog.Any("error", disconnectErr))
+		}
 
 		client.send(protocol.Message{
 			Op: protocol.OpVoiceDisconnect,
