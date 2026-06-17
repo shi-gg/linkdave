@@ -133,18 +133,11 @@ export class Player {
             throw new Error("Player is already connecting");
         }
 
+        this.#pendingVoice = null;
         this.#voiceChannelId = targetChannel;
         this.#state = PlayerState.Connecting;
 
-        this.#client._sendToShard(this.#guildId, {
-            op: GatewayOpcodes.VoiceStateUpdate,
-            d: {
-                guild_id: this.#guildId,
-                channel_id: targetChannel,
-                self_mute: this.#selfMute,
-                self_deaf: this.#selfDeaf
-            }
-        });
+        this.#sendVoiceStateUpdate(targetChannel);
 
         return new Promise<VoiceConnectPayload>((resolve, reject) => {
             const cleanup = () => {
@@ -161,7 +154,14 @@ export class Player {
             const timer = setTimeout(
                 () => {
                     cleanup();
-                    this.#pendingVoice = null;
+
+                    const hadVoiceState = this.#voiceState !== null;
+                    this.disconnect();
+
+                    if (hadVoiceState && this.#node.connected) {
+                        void this.#sendNodeDisconnect();
+                    }
+
                     reject(new Error(`Voice connection timed out for guild "${this.#guildId}"`));
                 },
                 timeoutMs
@@ -187,16 +187,7 @@ export class Player {
     }
 
     disconnect() {
-        this.#client._sendToShard(this.#guildId, {
-            op: GatewayOpcodes.VoiceStateUpdate,
-            d: {
-                guild_id: this.#guildId,
-                channel_id: null,
-                self_mute: false,
-                self_deaf: false
-            }
-        });
-
+        this.#sendVoiceStateUpdate(null);
         this.#cleanup();
     }
 
@@ -206,8 +197,7 @@ export class Player {
             this.#cleanup();
 
             if (hadVoiceState && this.#node.connected) {
-                const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
-                if (err) this.#node.emit(EventName.Error, err as Error);
+                await this.#sendNodeDisconnect();
             }
 
             return;
@@ -226,8 +216,7 @@ export class Player {
             this.#cleanup();
 
             if (hadVoiceState && this.#node.connected) {
-                const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
-                if (err) this.#node.emit(EventName.Error, err as Error);
+                await this.#sendNodeDisconnect();
             }
 
             return;
@@ -268,6 +257,23 @@ export class Player {
             session_id: sessionId,
             event
         });
+    }
+
+    #sendVoiceStateUpdate(channelId: string | null) {
+        this.#client._sendToShard(this.#guildId, {
+            op: GatewayOpcodes.VoiceStateUpdate,
+            d: {
+                guild_id: this.#guildId,
+                channel_id: channelId,
+                self_mute: channelId === null ? false : this.#selfMute,
+                self_deaf: channelId === null ? false : this.#selfDeaf
+            }
+        });
+    }
+
+    async #sendNodeDisconnect() {
+        const [, err] = await unwrap(this.#node.sendDisconnect(this.#guildId));
+        if (err) this.#node.emit(EventName.Error, err as Error);
     }
 
     async play(url: string, options: PlayOptions = {}, isFromQueue = false) {
