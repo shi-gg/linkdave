@@ -1,4 +1,4 @@
-import type { FiltersPayload } from "linkdave";
+import type { FiltersPayload, Player } from "linkdave";
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { constructUri, EventName, Filter, LinkDaveClient } from "linkdave";
 
@@ -136,8 +136,33 @@ discord.on(Events.MessageCreate, async (msg) => {
             player.filters.clear();
             break;
         }
+        case "!status": {
+            msg.reply(`\`\`\`${JSON.stringify(playerToJson(player))}\`\`\``)
+            break;
+        }
+        case "!kill": linkdave.removeNode(player.node.name); break;
     }
 });
+
+function playerToJson(player: Player) {
+    return {
+        connected: player.connected,
+        playing: player.playing,
+        paused: player.paused,
+        state: player.state,
+        current: player.current,
+        filters: {
+            activeFilters: player.filters.activeFilters,
+            pitch: player.filters.pitch,
+            speed: player.filters.speed
+        },
+        queue: {
+            size: player.queue.size,
+            active: player.queue.active,
+            next: player.queue.tracks[0]
+        }
+    };
+}
 
 process.on("SIGINT", () => {
     linkdave.disconnectAll();

@@ -37,6 +37,8 @@ type Connection struct {
 	setupCancel context.CancelFunc
 
 	stopChan chan struct{}
+
+	staleTimer *time.Timer
 }
 
 func NewConnection(
@@ -66,18 +68,13 @@ func NewConnection(
 }
 
 func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID, sessionID string, event protocol.VoiceServerEvent) error {
+	c.cancelStaleTimer()
+
 	c.mutex.Lock()
 	if c.setupCancel != nil {
 		c.setupCancel()
 	}
-	oldVC := c.voiceConn
 	c.mutex.Unlock()
-
-	if oldVC != nil {
-		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		oldVC.Close(closeCtx)
-		cancel()
-	}
 
 	c.setupMu.Lock()
 	defer c.setupMu.Unlock()
@@ -87,11 +84,8 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	}
 
 	c.mutex.Lock()
-	alreadySetUp := c.voiceConn != nil && c.voiceConn != oldVC
+	oldVC := c.voiceConn
 	c.mutex.Unlock()
-	if alreadySetUp {
-		return nil
-	}
 
 	var disconnected atomic.Bool
 
@@ -122,20 +116,24 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			return nil
 		},
 		func() {
-			c.logger.Debug("voice connection removed from manager")
-
-			if c.closed.Load() {
-				return
-			}
+			c.logger.Debug("voice connection removed from manager", slog.String("guild_id", c.guildID.String()))
 
 			c.mutex.Lock()
-			if c.voiceConn == vc {
+			wasCurrent := c.voiceConn == vc
+			replacing := wasCurrent && c.targetVoiceConn != nil
+			if wasCurrent {
 				c.voiceConn = nil
 			}
 			if c.targetVoiceConn == vc {
 				c.targetVoiceConn = nil
 			}
 			c.mutex.Unlock()
+
+			if !wasCurrent || replacing || c.closed.Load() {
+				return
+			}
+
+			c.scheduleUnexpectedDisconnect()
 		},
 		voice.WithConnLogger(c.logger),
 		voice.WithConnDaveSessionCreateFunc(session.New),
@@ -147,6 +145,12 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	c.setupCancel = openCancel
 	c.targetVoiceConn = vc
 	c.mutex.Unlock()
+
+	if oldVC != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		oldVC.Close(closeCtx)
+		cancel()
+	}
 
 	vc.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
 		VoiceState: discord.VoiceState{
@@ -182,13 +186,68 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	}
 
 	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.targetVoiceConn != vc {
+		return fmt.Errorf("voice connection closed during setup")
+	}
+
 	c.voiceConn = vc
 	c.targetVoiceConn = nil
 	c.channelID = channelID
 	vc.SetOpusFrameProvider(&trackWrapper{conn: c})
-	c.mutex.Unlock()
 
 	return nil
+}
+
+func (c *Connection) cancelStaleTimer() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.staleTimer == nil {
+		return
+	}
+
+	c.staleTimer.Stop()
+	c.staleTimer = nil
+}
+
+func (c *Connection) scheduleUnexpectedDisconnect() {
+	if c.closed.Load() {
+		return
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.staleTimer != nil {
+		c.staleTimer.Stop()
+	}
+
+	c.staleTimer = time.AfterFunc(time.Second, c.handleUnexpectedDisconnect)
+}
+
+func (c *Connection) handleUnexpectedDisconnect() {
+	c.mutex.Lock()
+
+	if c.staleTimer == nil {
+		c.mutex.Unlock()
+		return
+	}
+
+	c.staleTimer = nil
+	stale := c.voiceConn == nil && c.targetVoiceConn == nil
+
+	if !stale || c.closed.Swap(true) {
+		c.mutex.Unlock()
+		return
+	}
+
+	c.mutex.Unlock()
+	c.logger.Info("sending unexpected disconnect", slog.String("guild_id", c.guildID.String()))
+
+	c.Stop()
+	c.onDisconnect()
 }
 
 func (c *Connection) HandleVoiceUpdate(ctx context.Context, channelID snowflake.ID, sessionID string, event protocol.VoiceServerEvent) error {
@@ -343,6 +402,8 @@ func (c *Connection) Close() {
 	if c.closed.Swap(true) {
 		return
 	}
+
+	c.cancelStaleTimer()
 	c.Stop()
 
 	c.mutex.Lock()
@@ -355,9 +416,7 @@ func (c *Connection) Close() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	vc.Close(ctx)
 
-	c.logger.Debug("voice connection closed",
-		slog.String("guild_id", c.guildID.String()),
-	)
+	vc.Close(ctx)
+	c.logger.Debug("voice connection closed", slog.String("guild_id", c.guildID.String()))
 }
