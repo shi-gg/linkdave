@@ -87,14 +87,12 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	oldVC := c.voiceConn
 	c.mutex.Unlock()
 
-	var disconnected atomic.Bool
-
 	var vc voice.Conn
 	vc = voice.NewConn(
 		c.guildID,
 		c.userID,
 		func(ctx context.Context, guildID snowflake.ID, channelID *snowflake.ID, selfMute, selfDeaf bool) error {
-			if channelID != nil || vc == nil || disconnected.Swap(true) {
+			if channelID != nil || vc == nil {
 				return nil
 			}
 
