@@ -282,28 +282,18 @@ export class LinkDaveClient extends EventEmitter {
             return;
         }
 
-        if (data.reason === DisconnectReason.ConnectionLost) {
-            this.#handleConnectionLost(player);
-            return;
+        if (
+            player.voiceChannelId &&
+            (data.reason === DisconnectReason.ConnectionLost || data.reason === DisconnectReason.ConnectionFailed)
+        ) {
+            player.disconnect();
+        } else {
+            player._onVoiceDisconnect();
         }
 
-        player._onVoiceDisconnect();
         player.node.decrementPlayerCount();
         this.#players.delete(data.guild_id);
         this.emit(EventName.VoiceDisconnect, data);
-    }
-
-    #handleConnectionLost(player: Player) {
-        if (player.voiceChannelId) player.disconnect();
-        else player._onVoiceDisconnect();
-
-        player.node.decrementPlayerCount();
-        this.#players.delete(player.guildId);
-
-        this.emit(EventName.VoiceDisconnect, {
-            guild_id: player.guildId,
-            reason: DisconnectReason.ConnectionLost
-        });
     }
 
     _onPlayerDestroy(guildId: string) {
