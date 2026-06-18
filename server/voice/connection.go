@@ -117,19 +117,24 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 		},
 		func() {
 			c.logger.Debug("voice connection removed from manager", slog.String("guild_id", c.guildID.String()))
-
 			c.mutex.Lock()
-			wasCurrent := c.voiceConn == vc
-			replacing := wasCurrent && c.targetVoiceConn != nil
-			if wasCurrent {
+
+			current := c.voiceConn == vc
+			replacing := current && c.targetVoiceConn != nil
+
+			if current {
 				c.voiceConn = nil
 			}
+
 			if c.targetVoiceConn == vc {
 				c.targetVoiceConn = nil
+				if c.setupCancel != nil {
+					c.setupCancel()
+				}
 			}
-			c.mutex.Unlock()
 
-			if !wasCurrent || replacing || c.closed.Load() {
+			c.mutex.Unlock()
+			if !current || replacing || c.closed.Load() {
 				return
 			}
 
@@ -407,6 +412,9 @@ func (c *Connection) Close() {
 	c.Stop()
 
 	c.mutex.Lock()
+	if c.setupCancel != nil {
+		c.setupCancel()
+	}
 	vc := c.voiceConn
 	c.mutex.Unlock()
 
