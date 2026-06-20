@@ -75,36 +75,6 @@ Linkdave consists of a Go-based audio server that manages Discord voice connecti
 
 The server leverages custom audio processing to directly pipeline from an audio source into Discord's UDP socket for low-latency streaming without relying on external bloat.
 
-The following env variables can be set for the server.
-
-| Variable | Type | Default | Description |
-|---|---|---|---|
-| `LINKDAVE_SOURCE_HTTP_ENABLED` | bool | `false` | Enable HTTP source checking |
-| `LINKDAVE_SOURCE_HTTPS_ENABLED` | bool | `false` | Enable HTTPS source checking |
-| `LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED` | bool | `false` | Enable public IP address source |
-| `LINKDAVE_SOURCE_IP_ADDRESS_PRIVATE_ENABLED` | bool | `false` | Enable private IP address source |
-| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_ENABLED` | bool | `false` | Enable text-to-speech source |
-| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_URL` | string | `tts.wamellow.com/api/invoke` | Text-to-speech API endpoint |
-| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_TOKEN` | string | — | Authentication token for the TTS API |
-| `LINKDAVE_PASSWORD` | string | — | Application password |
-| `LINKDAVE_LOG_LEVEL` | string | `INFO` | Log level (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
-
-You can interact with the server over http with the following methods and paths.
-
-| Method | Route | Description |
-|---|---|---|
-| `GET` | `/health` | Health check |
-| `GET` | `/stats` | Server statistics |
-| `GET` | `/ws` | WebSocket endpoint |
-| `POST` | `/sessions/{session_id}/players/{guild_id}/play` | Play a track for a player in a session |
-| `POST` | `/sessions/{session_id}/players/{guild_id}/pause` | Pause the current track |
-| `POST` | `/sessions/{session_id}/players/{guild_id}/resume` | Resume the paused track |
-| `POST` | `/sessions/{session_id}/players/{guild_id}/stop` | Stop the current track |
-| `POST` | `/sessions/{session_id}/players/{guild_id}/seek` | Seek to a position in the track |
-| `DELETE` | `/sessions/{session_id}/players/{guild_id}` | Disconnect and destroy the player |
-
-<sub>Regarding the list of gateway events and their behavior, please read the source code.</sub>
-
 ### Docker Deployment
 To deploy Linkdave using Docker, you can use the following `compose.yml` configuration. This setup exposes the WebSocket API on port 8080 and includes health checks to ensure the service is running properly.
 
@@ -155,6 +125,23 @@ chmod +x linkdave
 
 LINKDAVE_SOURCE_HTTPS_ENABLED=true LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED=true ./linkdave
 ```
+
+---
+
+The following env variables can be set for the server.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `LINKDAVE_SOURCE_HTTP_ENABLED` | bool | `false` | Enable HTTP source checking |
+| `LINKDAVE_SOURCE_HTTPS_ENABLED` | bool | `false` | Enable HTTPS source checking |
+| `LINKDAVE_SOURCE_IP_ADDRESS_PUBLIC_ENABLED` | bool | `false` | Enable public IP address source |
+| `LINKDAVE_SOURCE_IP_ADDRESS_PRIVATE_ENABLED` | bool | `false` | Enable private IP address source |
+| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_ENABLED` | bool | `false` | Enable text-to-speech source |
+| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_URL` | string | `tts.wamellow.com/api/invoke` | Text-to-speech API endpoint |
+| `LINKDAVE_SOURCE_TEXT_TO_SPEECH_TOKEN` | string | — | Authentication token for the TTS API |
+| `LINKDAVE_PASSWORD` | string | — | Application password |
+| `LINKDAVE_PORT` | string | `8080` | Server port (don't use with docker) |
+| `LINKDAVE_LOG_LEVEL` | string | `INFO` | Log level (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 
 ## Using the Client Library (TypeScript)
 Linkdave provides a robust, fully type-safe, TypeScript client for seamless interaction.
