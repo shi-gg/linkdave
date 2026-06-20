@@ -15,10 +15,7 @@ import (
 	"github.com/shi-gg/linkdave/server/voice"
 )
 
-const (
-	PORT              = ":8080"
-	DRAIN_TIMEOUT_SEC = 30 // Time to wait for players to migrate before force shutdown
-)
+const DRAIN_TIMEOUT_SEC = 30
 
 var (
 	version  = ""
@@ -26,7 +23,7 @@ var (
 )
 
 func main() {
-	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel()})
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: getLogLevel()})
 	logger := slog.New(sentry.NewHandler(handler))
 	slog.SetDefault(logger)
 
@@ -37,6 +34,8 @@ func main() {
 	source.SetVersion(version)
 
 	manager := voice.NewManager(logger)
+
+	port := getPort()
 	server := server.NewServer(logger, manager, version, password)
 	mux := http.NewServeMux()
 
@@ -44,7 +43,7 @@ func main() {
 	server.RegisterRoutes(mux)
 
 	httpServer := &http.Server{
-		Addr:         PORT,
+		Addr:         port,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -54,7 +53,7 @@ func main() {
 	errChan := make(chan error, 1)
 
 	go func() {
-		logger.Info("server listening", slog.String("addr", PORT))
+		logger.Info("server listening", slog.String("addr", port))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errChan <- err
 		}
@@ -107,7 +106,7 @@ DrainLoop:
 	logger.Info("linkdave stopped")
 }
 
-func logLevel() slog.Level {
+func getLogLevel() slog.Level {
 	switch os.Getenv("LINKDAVE_LOG_LEVEL") {
 	case "DEBUG":
 		return slog.LevelDebug
@@ -118,4 +117,13 @@ func logLevel() slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+func getPort() string {
+	port := os.Getenv("LINKDAVE_PORT")
+	if port != "" {
+		return ":" + port
+	}
+
+	return ":8080"
 }
