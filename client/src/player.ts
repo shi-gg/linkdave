@@ -328,7 +328,8 @@ export class Player {
 
         const waitForVoiceDisconnect = this.#waitForNodeVoiceDisconnect(Player.CONNECT_TIMEOUT);
         await unwrap(this.#node.sendDisconnect(this.#guildId));
-        await waitForVoiceDisconnect;
+
+        if (await waitForVoiceDisconnect) return;
         this.#client._onPlayerDestroy(this.#guildId);
     }
 
@@ -475,9 +476,7 @@ export class Player {
                     void this.#node.sendDisconnect(this.#guildId);
                 }
 
-                this.#client._onPlayerDestroy(this.#guildId);
-
-                this.#client.emit(EventName.VoiceDisconnect, {
+                this.#node.emit(EventName.VoiceDisconnect, {
                     guild_id: this.#guildId,
                     reason: DisconnectReason.Inactivity
                 });
