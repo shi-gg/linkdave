@@ -275,14 +275,9 @@ export class LinkDaveClient extends EventEmitter {
     #handleVoiceDisconnect(node: Node, data: VoiceDisconnectPayload) {
         const player = this.#players.get(data.guild_id);
         if (player?.node !== node) return;
-        if (player.connecting) {
-            player._onVoiceDisconnect();
-            player.node.decrementPlayerCount();
-            this.#players.delete(data.guild_id);
-            return;
-        }
 
         if (
+            !player.connecting &&
             player.voiceChannelId &&
             (data.reason === DisconnectReason.ConnectionLost || data.reason === DisconnectReason.ConnectionFailed)
         ) {
@@ -293,7 +288,10 @@ export class LinkDaveClient extends EventEmitter {
 
         player.node.decrementPlayerCount();
         this.#players.delete(data.guild_id);
-        this.emit(EventName.VoiceDisconnect, data);
+
+        if (!player.connecting) {
+            this.emit(EventName.VoiceDisconnect, data);
+        }
     }
 
     _onPlayerDestroy(guildId: string) {
