@@ -34,7 +34,6 @@ jobs:
                   images: ${{ env.IMAGE_BASE }}
                   tags: |
                       type=raw,value=pr-${{ github.event.pull_request.number }}
-                      type=raw,value=pr
                       type=sha,format=short,pattern={{sha}}
 
             - name: Build and push Docker image
@@ -42,7 +41,7 @@ jobs:
               with:
                   context: .
                   push: ${{ github.actor == github.repository_owner }}
-                  build-args: BUILD_VERSION=${{ env.version }}
+                  build-args: BUILD_VERSION=pr-${{ github.event.pull_request.number }}
                   tags: ${{ steps.meta.outputs.tags }}
 
             - name: Comment on PR
