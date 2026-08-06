@@ -41,7 +41,7 @@ jobs:
               uses: docker/build-push-action@v7
               with:
                   context: .
-                  push: github.actor == github.repository_owner
+                  push: ${{ github.actor == github.repository_owner }}
                   build-args: BUILD_VERSION=${{ env.version }}
                   tags: ${{ steps.meta.outputs.tags }}
 
