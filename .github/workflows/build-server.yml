@@ -33,14 +33,23 @@ jobs:
               id: check_publish
               run: bun ./scripts/check-version.ts
 
-            - name: Build Docker image
-              run: docker build --build-arg BUILD_VERSION=${{ env.version }} -t ${{ env.IMAGE_BASE }}:${{ github.sha }} -t ${{ env.IMAGE_BASE }}:latest -t ${{ env.IMAGE_BASE }}:${{ env.version }} .
+            - name: Docker meta
+              id: meta
+              uses: docker/metadata-action@v6
+              with:
+                  images: ${{ env.IMAGE_BASE }}
+                  tags: |
+                      type=semver,value=${{ env.version }},pattern=v{{version}},enable=${{ env.publish == 'true' }}
+                      type=semver,value=${{ env.version }},pattern=v{{major}}.{{minor}},enable=${{ env.publish == 'true' }}
+                      type=semver,value=${{ env.version }},pattern=v{{major}},enable=${{ env.publish == 'true' }}
+                      type=raw,value=latest,enable=${{ env.publish == 'true' }}
+                      type=raw,value=git,enable=${{ env.publish != 'true' }}
+                      type=sha,format=short,pattern={{sha}}
 
-            - name: Push Docker image
-              run: docker push ${{ env.IMAGE_BASE }}:${{ github.sha }}
-
-            - name: Push Docker image (Release)
-              if: env.publish == 'true'
-              run: |
-                  docker push ${{ env.IMAGE_BASE }}:latest
-                  docker push ${{ env.IMAGE_BASE }}:${{ env.version }}
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v7
+              with:
+                  context: .
+                  push: true
+                  build-args: BUILD_VERSION=${{ env.version }}
+                  tags: ${{ steps.meta.outputs.tags }}
