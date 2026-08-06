@@ -44,7 +44,7 @@ jobs:
                       type=semver,value=${{ env.version }},pattern=v{{major}},enable=${{ env.publish == 'true' }}
                       type=raw,value=latest,enable=${{ env.publish == 'true' }}
                       type=raw,value=git,enable=${{ env.publish != 'true' }}
-                      type=sha,format=short,enable=${{ env.publish != 'true' }}
+                      type=sha,format=short,pattern={{sha}}
 
             - name: Build and push Docker image
               uses: docker/build-push-action@v7
