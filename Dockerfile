@@ -17,7 +17,8 @@ WORKDIR /app
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY . .
+COPY cmd/ ./cmd
+COPY server/ ./server
 
 ARG BUILD_VERSION
 RUN CGO_ENABLED=1 GOOS=linux go build \
