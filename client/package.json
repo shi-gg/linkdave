@@ -31,9 +31,9 @@
     "packageManager": "bun@1.3.10",
     "devDependencies": {
         "@mwlica/eslint": "^1.2.1",
-        "@types/node": "^26.0.1",
-        "typescript": "^6.0.3",
-        "typescript-eslint": "^8.62.0"
+        "@types/node": "^26.2.0",
+        "typescript": "6.0.3",
+        "typescript-eslint": "^8.66.0"
     },
     "keywords": [
         "discord",
@@ -44,6 +44,6 @@
     ],
     "license": "AGPL-3.0-only",
     "dependencies": {
-        "discord-api-types": "^0.38.49"
+        "discord-api-types": "^0.38.53"
     }
 }

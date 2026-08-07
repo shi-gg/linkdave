@@ -139,7 +139,7 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 			c.scheduleUnexpectedDisconnect()
 		},
 		voice.WithConnLogger(c.logger),
-		voice.WithConnDaveSessionCreateFunc(session.New),
+		voice.WithConnDaveSessionCreateFunc(session.CreateFunc()),
 	)
 
 	openCtx, openCancel := context.WithCancel(ctx)
