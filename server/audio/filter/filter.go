@@ -3,6 +3,7 @@ package filter
 import (
 	"fmt"
 	"math"
+	"slices"
 )
 
 type Type uint8
@@ -49,12 +50,7 @@ func (f *Filters) resolvedTimescale() (speed, pitch float64) {
 }
 
 func (f *Filters) hasFilter(ft Type) bool {
-	for _, t := range f.Enabled {
-		if t == ft {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(f.Enabled, ft)
 }
 
 func (f *Filters) IsEmpty() bool {

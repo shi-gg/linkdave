@@ -1,6 +1,6 @@
 module github.com/shi-gg/linkdave
 
-go 1.26.5
+go 1.27
 
 require (
 	github.com/disgoorg/disgo v0.19.7-0.20260805182242-e7af38d7f1c1
