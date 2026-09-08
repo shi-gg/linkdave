@@ -51,7 +51,7 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	}
 	if r.Level >= slog.LevelWarn && hub != nil && hub.Client() != nil {
 		tags := make(map[string]string)
-		extra := make(map[string]interface{})
+		extra := make(map[string]any)
 		var firstErr error
 		prefix := h.group
 		if prefix != "" {
@@ -112,7 +112,7 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 	}
 }
 
-func extractAttr(tags map[string]string, extra map[string]interface{}, firstErr *error, prefix string, a slog.Attr) {
+func extractAttr(tags map[string]string, extra map[string]any, firstErr *error, prefix string, a slog.Attr) {
 	a.Value = a.Value.Resolve()
 	if a.Value.Kind() == slog.KindGroup {
 		groupPrefix := prefix + a.Key + "."
