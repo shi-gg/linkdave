@@ -6,10 +6,10 @@
         "start": "bun run index.ts"
     },
     "dependencies": {
-        "linkdave": "file:../client",
-        "discord.js": "^14.27.0"
+        "discord.js": "^14.27.0",
+        "linkdave": "file:../client"
     },
     "devDependencies": {
-        "@types/node": "^26.1.2"
+        "@types/node": "^26.5.1"
     }
 }

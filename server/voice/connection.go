@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/voice"
 	"github.com/disgoorg/snowflake/v2"
@@ -103,11 +102,9 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 
 			if isCurrent || isTarget {
 				vc.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
-					VoiceState: discord.VoiceState{
-						GuildID:   guildID,
-						ChannelID: nil,
-						UserID:    c.userID,
-					},
+					GuildID:   guildID,
+					ChannelID: nil,
+					UserID:    c.userID,
 				})
 			}
 
@@ -156,12 +153,10 @@ func (c *Connection) setupVoiceConn(ctx context.Context, channelID snowflake.ID,
 	}
 
 	vc.HandleVoiceStateUpdate(gateway.EventVoiceStateUpdate{
-		VoiceState: discord.VoiceState{
-			GuildID:   c.guildID,
-			ChannelID: &channelID,
-			UserID:    c.userID,
-			SessionID: sessionID,
-		},
+		GuildID:   c.guildID,
+		ChannelID: &channelID,
+		UserID:    c.userID,
+		SessionID: sessionID,
 	})
 	vc.HandleVoiceServerUpdate(gateway.EventVoiceServerUpdate{
 		Token:    event.Token,
@@ -360,12 +355,11 @@ func (w *trackWrapper) ProvideOpusFrame() ([]byte, error) {
 }
 
 func (w *trackWrapper) Close() {
-	w.conn.mutex.Lock()
-	defer w.conn.mutex.Unlock()
-
-	if w.conn.source != nil {
-		w.conn.source.Close()
-	}
+	// Disgo's AudioSender now propagates Close to its OpusFrameProvider
+	// (disgoorg/disgo#612). The playback source outlives individual voice
+	// conns across channel moves/server changes and is owned by Connection
+	// (Play/Stop/handleTrackEnd/Close), so closing it here would kill
+	// playback on every move when the old conn is torn down.
 }
 
 func (c *Connection) provideOpusFrame(src source.Source) ([]byte, error) {
