@@ -1,6 +1,6 @@
 {
     "name": "linkdave",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "author": "Luna Seemann <luna@wamellow.com> (http://shi.gg)",
     "description": "TypeScript client library for linkdave Discord audio streaming server",
     "repository": {
@@ -26,14 +26,17 @@
     },
     "engines": {
         "node": ">=24.0.0",
-        "bun": ">=1.3.10"
+        "bun": ">=1.4.2"
     },
-    "packageManager": "bun@1.3.10",
+    "packageManager": "bun@1.4.2",
+    "peerDependencies": {
+        "discord-api-types": "^0.38.55"
+    },
     "devDependencies": {
         "@mwlica/eslint": "^1.2.1",
-        "@types/node": "^26.2.0",
+        "@types/node": "^26.5.1",
         "typescript": "6.0.3",
-        "typescript-eslint": "^8.66.0"
+        "typescript-eslint": "^8.70.0"
     },
     "keywords": [
         "discord",
@@ -42,8 +45,5 @@
         "streaming",
         "linkdave"
     ],
-    "license": "AGPL-3.0-only",
-    "dependencies": {
-        "discord-api-types": "^0.38.53"
-    }
+    "license": "AGPL-3.0-only"
 }
